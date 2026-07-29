@@ -5,7 +5,7 @@ services:
     image: ibkr-rest-api
     container_name: ibkr
     environment:
-      IBKR_ACCOUNT_ID: "U1234567"
+      IBKR_ACCOUNT_ID: "DUO504961"
     ports:
       - "5055:5055"
       - "5056:5056"
