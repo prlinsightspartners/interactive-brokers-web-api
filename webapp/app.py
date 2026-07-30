@@ -68,9 +68,10 @@ def contract(contract_id, period='5d', bar='1d'):
 
 @app.route("/orders")
 def orders():
+    print("== fetching orders ==")
     r = requests.get(f"{BASE_API_URL}/iserver/account/orders", verify=False)
     orders = r.json()["orders"]
-    
+
     # place order code
     return render_template("orders.html", orders=orders)
 
@@ -115,57 +116,6 @@ def portfolio():
 
     # return my positions, how much cash i have in this account
     return render_template("portfolio.html", positions=positions)
-
-@app.route("/watchlists")
-def watchlists():
-    r = requests.get(f"{BASE_API_URL}/iserver/watchlists", verify=False)
-
-    watchlist_data = r.json()["data"]
-    watchlists = []
-    if "user_lists" in watchlist_data:
-        watchlists = watchlist_data["user_lists"]
-        
-    return render_template("watchlists.html", watchlists=watchlists)
-
-
-@app.route("/watchlists/<int:id>")
-def watchlist_detail(id):
-    r = requests.get(f"{BASE_API_URL}/iserver/watchlist?id={id}", verify=False)
-
-    watchlist = r.json()
-
-    return render_template("watchlist.html", watchlist=watchlist)
-
-
-@app.route("/watchlists/<int:id>/delete")
-def watchlist_delete(id):
-    r = requests.delete(f"{BASE_API_URL}/iserver/watchlist?id={id}", verify=False)
-
-    return redirect("/watchlists")
-
-@app.route("/watchlists/create", methods=['POST'])
-def create_watchlist():
-    data = request.get_json()
-    name = data['name']
-
-    rows = []
-    symbols = data['symbols'].split(",")
-    for symbol in symbols:
-        symbol = symbol.strip()
-        if symbol:
-            r = requests.get(f"{BASE_API_URL}/iserver/secdef/search?symbol={symbol}&name=true&secType=STK", verify=False)
-            contract_id = r.json()[0]['conid']
-            rows.append({"C": contract_id})
-
-    data = {
-        "id": int(time.time()),
-        "name": name,
-        "rows": rows
-    }
-
-    r = requests.post(f"{BASE_API_URL}/iserver/watchlist", json=data, verify=False)
-    
-    return redirect("/watchlists")
 
 @app.route("/scanner")
 def scanner():
