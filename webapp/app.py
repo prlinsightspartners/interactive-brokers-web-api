@@ -69,13 +69,27 @@ def contract(contract_id, period='5d', bar='1d'):
 @app.route("/orders")
 def orders():
     print("== fetching orders ==")
-    r = requests.get(f"{BASE_API_URL}/iserver/account/orders", verify=False)
-    orders = r.json()["orders"]
+    print("Account_ID used for fetching orders: ", ACCOUNT_ID)
 
-    # place order code
-    return render_template("orders.html", orders=orders)
-
-
+    try:
+        r = requests.get(f"{BASE_API_URL}/iserver/account/{ACCOUNT_ID}/orders", verify=False)
+        print(f"Orders Response Status: {r.status_code}")
+        print(f"Orders Response: {r.text}")
+        
+        if r.status_code >= 400:
+            error_msg = f"Failed to fetch orders with status {r.status_code}: {r.text}"
+            print(error_msg)
+            return render_template("orders.html", orders=[], error=error_msg)
+        
+        if r.text:
+            orders = r.json()["orders"]
+        else:
+            orders = []
+            print("No orders returned from IBKR")
+    except Exception as e:
+        error_msg = f"Error fetching orders: {str(e)}"
+        print(error_msg)
+        return render_template("orders.html", orders=[], error=error_msg)
 @app.route("/limit_order", methods=['POST'])
 def place_order():
     print("== placing Limit Order ==")
