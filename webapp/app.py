@@ -1,8 +1,8 @@
 import requests, time, os, random
 from flask import Flask, render_template, request, redirect
+from urllib3.exceptions import InsecureRequestWarning
 
 # disable warnings until you install a certificate
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 BASE_API_URL = "https://localhost:5055/v1/api"
@@ -76,9 +76,10 @@ def orders():
     return render_template("orders.html", orders=orders)
 
 
-@app.route("/order", methods=['POST'])
+@app.route("/limit_order", methods=['POST'])
 def place_order():
-    print("== placing order ==")
+    print("== placing Limit Order ==")
+    print("Account_ID used for limit order: ", ACCOUNT_ID)
 
     data = {
         "orders": [
@@ -93,7 +94,26 @@ def place_order():
         ]
     }
 
-    r = requests.post(f"{BASE_API_URL}/iserver/account/{ACCOUNT_ID}/orders", json=data, verify=False)
+    print(f"Order payload: {data}")
+    
+    try:
+        r = requests.post(f"{BASE_API_URL}/iserver/account/{ACCOUNT_ID}/orders", json=data, verify=False)
+        print(f"IBKR Response Status: {r.status_code}")
+        print(f"IBKR Response: {r.text}")
+        
+        # Check for errors in response
+        if r.status_code >= 400:
+            error_msg = f"Order submission failed with status {r.status_code}: {r.text}"
+            print(error_msg)
+            return render_template("orders.html", orders=[], error=error_msg)
+        
+        response_json = r.json()
+        print(f"Order response JSON: {response_json}")
+        
+    except Exception as e:
+        error_msg = f"Error placing order: {str(e)}"
+        print(error_msg)
+        return render_template("orders.html", orders=[], error=error_msg)
 
     return redirect("/orders")
 
