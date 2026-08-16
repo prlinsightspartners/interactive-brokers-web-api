@@ -1,10 +1,15 @@
 {% extends "layout.html" %}
 
+{% block title %}Market Scanner | Interactive Brokers Client Portal{% endblock %}
+
 {% block content %}
 
-<h2>Market Scanner</h2>
+<div class="page-header">
+    <h2>Market Scanner</h2>
+    <p class="lead">Filter and scan the market for instruments matching your criteria.</p>
+</div>
 
-<div>
+<div class="card p-4 mb-4">
     <form id="scan" action="" method="get">
         <div class="row">
             <div class="col col-sm-2">
@@ -47,9 +52,9 @@
     </form>
 
 
-    <h3>Results</h3>
+    <h3 class="mt-4">Results</h3>
 
-    <table class="table table-striped">    
+    <table class="data-table">    
     {% for contract in scan_results['contracts'] %}
         <tr>
             <td>
@@ -66,9 +71,9 @@
     </table>
 
     {% if stocks %}
-        <h3>Companies</h3>
+        <h3 class="mt-4">Companies</h3>
 
-        <table class="table table-striped">
+        <table class="data-table">
             {% for stock in stocks %}
             <tr>
                 <td>

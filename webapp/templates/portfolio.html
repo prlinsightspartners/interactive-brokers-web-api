@@ -1,44 +1,95 @@
 {% extends "layout.html" %}
 
+{% block title %}Portfolio | Interactive Brokers Client Portal{% endblock %}
+
 {% block content %}
 
-<h2>Positions</h2>
+<div class="page-header">
+    <h2>Personal Portfolio for Account ID: {{ account_id }}</h2>
+    <p class="lead">Overview of your account positions, market value, and unrealized performance.</p>
+</div>
 
-<table class="table table-striped">
-    <tr>
-        <th>Instrument</th>
-        <th>Quantity</th>
-        <th>Average Cost</th>
-        <th>Current Price</th>
-        <th>Current Value</th>
-        <th>Profit / Loss</th>
-    </tr>
+{% if positions %}
+    {% set total_value = positions|sum(attribute='mktValue') %}
+    {% set total_pnl = positions|sum(attribute='unrealizedPnl') %}
 
-    {% for item in positions %}
-    <tr>
-        <td>
-            <strong>
-                <a href="/contract/{{ item['conid'] }}/365d">{{ item['name'] }}</a>
-            </strong>
-            <br />
-            {{ item['contractDesc'] }}<br />
-            {{ item['conid'] }}
-        </td>
-        <td>{{ item['position'] }}</td>
-        <td>${{ item['avgCost'] }}</td>
-        <td>${{ item['mktPrice']|round(2) }}</td>
-        <td>${{ item['mktValue'] }}</td>
-        <td class="pt-4">
-            <span class="alert {% if item['unrealizedPnl'] >= 0 %}alert-success{% else %}alert-danger{% endif %}">
-                {{ item['unrealizedPnl'] }}
-            </span>
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="6">No positions found</td>
-    </tr>
-    {% endfor %}
-</table>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card metric-card">
+                <div>
+                    <div class="metric-label">Total Market Value</div>
+                    <div class="metric-value">${{ "%.2f"|format(total_value) }}</div>
+                    <div class="metric-change text-muted">Across {{ positions|length }} position{{ 's' if positions|length != 1 else '' }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card metric-card">
+                <div>
+                    <div class="metric-label">Unrealized P&L</div>
+                    <div class="metric-value {% if total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if total_pnl >= 0 %}+{% endif %}${{ "%.2f"|format(total_pnl) }}
+                    </div>
+                    <div class="metric-change {% if total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if total_pnl >= 0 %}▲{% else %}▼{% endif %} {{ "%.2f"|format((total_pnl / total_value * 100) if total_value else 0) }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card metric-card">
+                <div>
+                    <div class="metric-label">Open Positions</div>
+                    <div class="metric-value">{{ positions|length }}</div>
+                    <div class="metric-change text-muted">Active holdings</div>
+                </div>
+              </div>
+        </div>
+    </div>
+
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="data-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Instrument</th>
+                        <th class="text-end">Quantity</th>
+                        <th class="text-end">Average Cost</th>
+                        <th class="text-end">Current Price</th>
+                        <th class="text-end">Market Value</th>
+                        <th class="text-end">Unrealized P&L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in positions %}
+                    <tr>
+                        <td>
+                            <div class="cell-primary">
+                                <a href="/contract/{{ item['conid'] }}/365d">{{ item['name'] }}</a>
+                            </div>
+                            <div class="cell-secondary">{{ item['contractDesc'] }} &middot; {{ item['conid'] }}</div>
+                        </td>
+                        <td class="text-end cell-mono fw-semibold">{{ item['position'] }}</td>
+                        <td class="text-end cell-mono">${{ "%.2f"|format(item['avgCost']) }}</td>
+                        <td class="text-end cell-mono">${{ "%.2f"|format(item['mktPrice']) }}</td>
+                        <td class="text-end cell-mono fw-semibold">${{ "%.2f"|format(item['mktValue']) }}</td>
+                        <td class="text-end">
+                            <span class="badge-pill {% if item['unrealizedPnl'] >= 0 %}badge-success{% else %}badge-danger{% endif %}">
+                                {% if item['unrealizedPnl'] >= 0 %}+{% endif %}${{ "%.2f"|format(item['unrealizedPnl']) }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📂</div>
+        <div class="empty-state-title">No positions found</div>
+        <p class="empty-state-text">Your portfolio is currently empty. Place an order or check back once your account has holdings.</p>
+    </div>
+{% endif %}
 
 {% endblock %}

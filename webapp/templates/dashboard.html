@@ -1,7 +1,14 @@
 {% extends "layout.html" %}
+
+{% block title %}Dashboard | Interactive Brokers Client Portal{% endblock %}
+
 {% block content %}
-<h2>Dashboard</h2>
-<table class="table table-striped">
+<div class="page-header">
+    <h2>Dashboard</h2>
+    <p class="lead">Account summary and key balances at a glance.</p>
+</div>
+
+<table class="data-table">
     <tr>
         <td>
             Currency
