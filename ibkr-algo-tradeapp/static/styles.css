@@ -1,0 +1,138 @@
+/* ==================================================
+   Dashboard & Table Styles
+   ================================================== */
+   
+.dashboard-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  overflow: hidden; /* Ensures child elements respect the border radius */
+}
+
+table { 
+  width: 100%; 
+  border-collapse: collapse; 
+}
+
+th, td { 
+  padding: 15px; 
+  text-align: left; 
+  border-bottom: 1px solid #eee;
+}
+
+th { 
+  background: #f8f9fa;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tr:hover { 
+  background-color: #f5f7fa; 
+}
+
+.action-tag.buy { 
+  color: #27ae60; 
+  background: #e9f7ef;
+  font-weight: bold; 
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.action-tag.sell { 
+  color: #e74c3c; 
+  background: #fdedec;
+  font-weight: bold; 
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+}
+
+.symbol-link {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 600;
+}
+.symbol-link:hover {
+  text-decoration: underline;
+}
+
+.price-cell {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 600;
+}
+
+/* Main Container */
+.container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+/* Chart Section */
+.chart-section {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  padding: 20px;
+}
+
+#controls {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#symbol {
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-width: 200px;
+}
+
+button {
+  background: #3498db;
+  color: white;
+  border: none;
+  cursor: pointer;
+  padding: 9px 15px;
+  font-size: 16px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+button:hover {
+  background: #2980b9;
+}
+
+#chart {
+  width: 100%;
+  height: 600px;
+  position: relative;
+  transition: opacity 0.3s ease;
+}
+#chart.loading {
+  opacity: 0.5;
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 20px;
+  color: #7f8c8d;
+  display: none;
+}
+.loading-indicator.show {
+  display: block;
+}

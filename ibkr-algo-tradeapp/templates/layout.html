@@ -1,0 +1,5 @@
+<ul class="nav-links">
+	<li><a href="/" {% if request.url.path == "/" %}class="active"{% endif %}>Real-Time Chart</a></li>
+	<li><a href="/scanner" {% if request.url.path == "/scanner" %}class="active"{% endif %}>Market Scanner</a></li>
+	<li><a href="/tradelog" {% if request.url.path == "/tradelog" %}class="active"{% endif %}>Trade Log</a></li>
+</ul>

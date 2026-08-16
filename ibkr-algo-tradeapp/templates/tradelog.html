@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}Trade Log - IBKR Trading{% endblock %}
+
+{% block content %}
+<h1>Trade Log</h1>
+
+<div class="dashboard-container">
+  {% if trades %}
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Symbol</th>
+        <th>Action</th>
+        <th>Quantity</th>
+        <th>Fill Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for trade in trades %}
+      <tr>
+        <td>{{ trade.timestamp }}</td>
+        <td class="symbol-cell">
+          <a href="/?symbol={{ trade.symbol }}" class="symbol-link" title="View {{ trade.symbol }} chart">{{ trade.symbol }}</a>
+        </td>
+        <td><span class="action-tag {{ 'buy' if trade.action == 'BUY' else 'sell' }}">{{ trade.action }}</span></td>
+        <td>{{ trade.quantity }}</td>
+        <td class="price-cell">${{ '%.2f'|format(trade.price) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <p>No trades have been recorded yet. Executed trades from webhooks will appear here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "layout.html" %}
+
+{% block extra_head %}
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="chart-section">
+    <div id="controls">
+      <div class="control-group">
+        <label for="symbol">Symbol:</label>
+        <input id="symbol" type="text" placeholder="Enter symbol (e.g. AAPL)" />
+        <button onclick="subscribeSymbol()">Load Chart</button>
+      </div>
+    </div>
+
+    <div id="chart"></div>
+    <div id="loading" class="loading-indicator">Loading chart data...</div>
+  </div>
+
+    {% endblock %}
+
+{% block extra_scripts %}
+<script>
+const { createChart, CandlestickSeries } = LightweightCharts;
+
+const chartElement = document.getElementById('chart');
+const chart = LightweightCharts.createChart(chartElement, {
+    width: document.getElementById('chart').clientWidth,
+    height: 600,
+    layout: {
+        background: { color: '#ffffff' },
+        textColor: '#000000',
+    },
+    grid: {
+        vertLines: { color: '#e0e0e0' },
+        horzLines: { color: '#e0e0e0' },
+    },
+    timeScale: {
+        timeVisible: true,
+        secondsVisible: true,
+        rightOffset: 12,
+        borderVisible: false,
+    },
+    rightPriceScale: {
+        borderVisible: false,
+        scaleMargins: {
+            top: 0.1,
+            bottom: 0.1,
+        },
+    },
+    crosshair: {
+        mode: 0, // Normal crosshair mode
+        vertLine: {
+            width: 1,
+            color: '#758696',
+            style: 2, // LineStyle.Dashed
+        },
+        horzLine: {
+            width: 1,
+            color: '#758696',
+            style: 2, // LineStyle.Dashed
+        },
+    },
+});
+
+const series = chart.addSeries(CandlestickSeries, {
+    upColor: '#26a69a',
+    downColor: '#ef5350',
+    borderVisible: false,
+    wickUpColor: '#26a69a',
+    wickDownColor: '#ef5350',
+});
+
+async function subscribeSymbol() {
+    const symbol = document.getElementById("symbol").value.toUpperCase();
+
+    // fetch historical data
+    const historyResponse = await fetch(`/history?symbol=${symbol}`);
+    const historicalData = await historyResponse.json();
+
+    // set data to the chart
+    series.setData(historicalData);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const symbolFromUrl = urlParams.get('symbol');
+    
+    const defaultSymbol = symbolFromUrl || 'SPY';
+    
+    document.getElementById('symbol').value = defaultSymbol;
+
+    subscribeSymbol();
+});
+</script>
+{% endblock %}

@@ -21,6 +21,7 @@ COPY conf.yaml gateway/root/conf.yaml
 COPY start.sh /app
 
 ADD webapp webapp
+ADD ibkr-algo-tradeapp ibkr-algo-tradeapp
 ADD scripts scripts
 
 # Commented out for now, some commands that are helpful if you want to install your own SSL certificate
@@ -32,7 +33,7 @@ ADD scripts scripts
 # RUN cp cacert.pem webapp/cacert.pem
 
 # Expose the port so we can connect
-EXPOSE 5055 5056
+EXPOSE 5055 5056 4002
 
 # Run the gateway
 CMD sh ./start.sh
