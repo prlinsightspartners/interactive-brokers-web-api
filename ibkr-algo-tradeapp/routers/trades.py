@@ -181,6 +181,7 @@ async def webhook(
         # This structure matches the recommended TradingView alert message format
         symbol = data["symbol"].upper()
         action = data["strategy"]["order_action"].upper()  # 'BUY' or 'SELL'
+        
         try:
             quantity = int(float(data["strategy"]["order_contracts"]))
         except (TypeError, ValueError):
