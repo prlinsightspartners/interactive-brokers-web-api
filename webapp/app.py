@@ -1,5 +1,6 @@
 import requests, time, os, random
 from flask import Flask, render_template, request, redirect, session
+from trade_db import ensure_database, upsert_trade
 from urllib3.exceptions import InsecureRequestWarning
 
 # disable warnings until you install a certificate
@@ -12,6 +13,9 @@ os.environ['PYTHONHTTPSVERIFY'] = '0'
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(32))
+database_connection, database_cursor = ensure_database()
+database_cursor.close()
+database_connection.close()
 
 @app.template_filter('ctime')
 def timectime(s):
@@ -20,6 +24,99 @@ def timectime(s):
 
 def get_active_account_id():
     return session.get('account_id', ACCOUNT_ID)
+
+
+def confirm_ibkr_warnings(response_json):
+    for _ in range(10):
+        if not isinstance(response_json, list):
+            return response_json
+
+        confirmation = next(
+            (
+                item for item in response_json
+                if item.get('id') and 'Yes' in item.get('messageOptions', [])
+            ),
+            None
+        )
+        if confirmation is None:
+            return response_json
+
+        reply_id = confirmation['id']
+        print(f"Automatically confirming IBKR warning {reply_id}: {confirmation.get('message')}")
+        r = requests.post(
+            f"{BASE_API_URL}/iserver/reply/{reply_id}",
+            json={"confirmed": True},
+            verify=False
+        )
+        print(f"IBKR confirmation response status: {r.status_code}")
+        print(f"IBKR confirmation response: {r.text}")
+        r.raise_for_status()
+        response_json = r.json()
+
+    raise RuntimeError("IBKR returned too many consecutive order confirmation prompts")
+
+
+def first_order_response(response_json):
+    if isinstance(response_json, list) and response_json:
+        return response_json[0]
+    if isinstance(response_json, dict):
+        return response_json
+    return {}
+
+
+def record_submitted_order(account_id, submitted_order, response_json):
+    ibkr_response = first_order_response(response_json)
+    order_id = (
+        ibkr_response.get('order_id')
+        or ibkr_response.get('orderId')
+        or ibkr_response.get('id')
+    )
+    if not order_id:
+        print("IBKR did not return an order identifier; order was not added to the trade log")
+        return
+
+    ticker = request.form.get('ticker', '')
+    quantity = submitted_order['quantity']
+    action = submitted_order['side']
+    order_type = submitted_order['orderType']
+    price = submitted_order.get('price', 0)
+    status = ibkr_response.get('order_status') or ibkr_response.get('status') or 'PendingSubmit'
+    order_description = ibkr_response.get('order_description') or f"{action} {quantity} {ticker}"
+
+    upsert_trade(
+        account_id=account_id,
+        order_id=order_id,
+        ticker=ticker,
+        description=request.form.get('description', ''),
+        company=request.form.get('company', ''),
+        order_description=order_description,
+        order_type=order_type,
+        status=status,
+        action=action,
+        quantity=quantity,
+        price=price,
+    )
+
+
+def record_live_orders(account_id, orders):
+    for order in orders:
+        order_id = order.get('orderId') or order.get('order_id')
+        if not order_id:
+            continue
+
+        upsert_trade(
+            account_id=account_id,
+            order_id=order_id,
+            ticker=order.get('ticker', ''),
+            description=order.get('description1', ''),
+            company=order.get('companyName', ''),
+            order_description=order.get('orderDesc', ''),
+            order_type=order.get('orderType', ''),
+            status=order.get('status', ''),
+            action=order.get('side', ''),
+            quantity=order.get('totalSize') or order.get('quantity') or order.get('size') or 0,
+            price=order.get('avgPrice') or order.get('price') or order.get('limit_price') or 0,
+        )
 
 
 def fetch_subaccounts():
@@ -123,6 +220,7 @@ def orders():
 
         if r.text:
             orders = r.json()["orders"]
+            record_live_orders(active_account_id, orders)
         else:
             orders = []
             print("No orders returned from IBKR")
@@ -168,8 +266,53 @@ def place_order():
             return render_template("orders.html", orders=[], error=error_msg)
         
         response_json = r.json()
+        response_json = confirm_ibkr_warnings(response_json)
+        record_submitted_order(active_account_id, data['orders'][0], response_json)
         print(f"Order response JSON: {response_json}")
         
+    except Exception as e:
+        error_msg = f"Error placing order: {str(e)}"
+        print(error_msg)
+        return render_template("orders.html", orders=[], error=error_msg)
+
+    return redirect("/orders")
+
+
+@app.route("/market_order", methods=['POST'])
+def place_market_order():
+    active_account_id = get_active_account_id()
+    print("== placing Market Order ==")
+    print("Account_ID used for market order: ", active_account_id)
+
+    data = {
+        "orders": [
+            {
+                "conid": int(request.form.get('contract_id')),
+                "orderType": "MKT",
+                "quantity": int(request.form.get('quantity')),
+                "side": request.form.get('side'),
+                "tif": "GTC"
+            }
+        ]
+    }
+
+    print(f"Order payload: {data}")
+
+    try:
+        r = requests.post(f"{BASE_API_URL}/iserver/account/{active_account_id}/orders", json=data, verify=False)
+        print(f"IBKR Response Status: {r.status_code}")
+        print(f"IBKR Response: {r.text}")
+
+        if r.status_code >= 400:
+            error_msg = f"Order submission failed with status {r.status_code}: {r.text}"
+            print(error_msg)
+            return render_template("orders.html", orders=[], error=error_msg)
+
+        response_json = r.json()
+        response_json = confirm_ibkr_warnings(response_json)
+        record_submitted_order(active_account_id, data['orders'][0], response_json)
+        print(f"Order response JSON: {response_json}")
+
     except Exception as e:
         error_msg = f"Error placing order: {str(e)}"
         print(error_msg)
