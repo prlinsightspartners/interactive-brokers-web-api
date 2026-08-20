@@ -6,6 +6,7 @@ services:
     container_name: ibkr
     environment:
       IBKR_ACCOUNT_ID: "DUO504961"
+      WEBHOOK_SECRET: your_super_secret_string_123
     ports:
       - "5055:5055"
       - "5056:5056"

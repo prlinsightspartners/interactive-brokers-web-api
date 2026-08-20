@@ -1,4 +1,4 @@
-import requests, time, os, random, csv
+import requests, time, os, random, json
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, session, jsonify
 from trade_db import ensure_database, upsert_trade
@@ -22,70 +22,20 @@ database_connection.close()
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-CSV_FIELDS = [
-    "received_at",
-    "secret",
-    "time",
-    "exchange",
-    "symbol",
-    "bar_time",
-    "bar_open",
-    "bar_high",
-    "bar_low",
-    "bar_close",
-    "bar_volume",
-    "strategy_position_size",
-    "strategy_order_action",
-    "strategy_order_contracts",
-    "strategy_order_price",
-    "strategy_order_id",
-    "strategy_market_position",
-    "strategy_market_position_size",
-    "strategy_prev_market_position",
-    "strategy_prev_market_position_size",
-    "raw_body",
-]
-
 
 def log_webhook_traffic(payload, raw_body=""):
-    """Append every incoming webhook request to a daily CSV file for traffic verification."""
+    """Append every incoming webhook request to a daily JSON Lines file for traffic verification."""
     received_at = datetime.now(timezone.utc)
-    csv_path = os.path.join(DATA_DIR, f"webhook_traffic_{received_at:%Y%m%d}.csv")
-    file_exists = os.path.isfile(csv_path)
+    json_path = os.path.join(DATA_DIR, f"webhook_traffic_{received_at:%Y%m%d}.jsonl")
 
-    payload = payload if isinstance(payload, dict) else {}
-    bar = payload.get("bar") or {}
-    strategy = payload.get("strategy") or {}
-
-    row = {
+    record = {
         "received_at": received_at.isoformat(),
-        "secret": payload.get("secret"),
-        "time": payload.get("time"),
-        "exchange": payload.get("exchange"),
-        "symbol": payload.get("symbol"),
-        "bar_time": bar.get("time"),
-        "bar_open": bar.get("open"),
-        "bar_high": bar.get("high"),
-        "bar_low": bar.get("low"),
-        "bar_close": bar.get("close"),
-        "bar_volume": bar.get("volume"),
-        "strategy_position_size": strategy.get("position_size"),
-        "strategy_order_action": strategy.get("order_action"),
-        "strategy_order_contracts": strategy.get("order_contracts"),
-        "strategy_order_price": strategy.get("order_price"),
-        "strategy_order_id": strategy.get("order_id"),
-        "strategy_market_position": strategy.get("market_position"),
-        "strategy_market_position_size": strategy.get("market_position_size"),
-        "strategy_prev_market_position": strategy.get("prev_market_position"),
-        "strategy_prev_market_position_size": strategy.get("prev_market_position_size"),
-        "raw_body": raw_body,
+        "payload": payload if isinstance(payload, dict) else None,
+        "raw_body": raw_body if not isinstance(payload, dict) else "",
     }
 
-    with open(csv_path, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
-        if not file_exists:
-            writer.writeheader()
-        writer.writerow(row)
+    with open(json_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
 
 @app.template_filter('ctime')
 def timectime(s):
