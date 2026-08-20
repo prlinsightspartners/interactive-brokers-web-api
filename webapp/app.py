@@ -1,5 +1,6 @@
-import requests, time, os, random
-from flask import Flask, render_template, request, redirect, session
+import requests, time, os, random, csv
+from datetime import datetime, timezone
+from flask import Flask, render_template, request, redirect, session, jsonify
 from trade_db import ensure_database, upsert_trade
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -8,6 +9,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 BASE_API_URL = "https://localhost:5055/v1/api"
 ACCOUNT_ID = os.environ['IBKR_ACCOUNT_ID']
+WEBHOOK_SECRET = os.environ["WEBHOOK_SECRET"]
 
 os.environ['PYTHONHTTPSVERIFY'] = '0'
 
@@ -16,6 +18,74 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(32))
 database_connection, database_cursor = ensure_database()
 database_cursor.close()
 database_connection.close()
+
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+CSV_FIELDS = [
+    "received_at",
+    "secret",
+    "time",
+    "exchange",
+    "symbol",
+    "bar_time",
+    "bar_open",
+    "bar_high",
+    "bar_low",
+    "bar_close",
+    "bar_volume",
+    "strategy_position_size",
+    "strategy_order_action",
+    "strategy_order_contracts",
+    "strategy_order_price",
+    "strategy_order_id",
+    "strategy_market_position",
+    "strategy_market_position_size",
+    "strategy_prev_market_position",
+    "strategy_prev_market_position_size",
+    "raw_body",
+]
+
+
+def log_webhook_traffic(payload, raw_body=""):
+    """Append every incoming webhook request to a daily CSV file for traffic verification."""
+    received_at = datetime.now(timezone.utc)
+    csv_path = os.path.join(DATA_DIR, f"webhook_traffic_{received_at:%Y%m%d}.csv")
+    file_exists = os.path.isfile(csv_path)
+
+    payload = payload if isinstance(payload, dict) else {}
+    bar = payload.get("bar") or {}
+    strategy = payload.get("strategy") or {}
+
+    row = {
+        "received_at": received_at.isoformat(),
+        "secret": payload.get("secret"),
+        "time": payload.get("time"),
+        "exchange": payload.get("exchange"),
+        "symbol": payload.get("symbol"),
+        "bar_time": bar.get("time"),
+        "bar_open": bar.get("open"),
+        "bar_high": bar.get("high"),
+        "bar_low": bar.get("low"),
+        "bar_close": bar.get("close"),
+        "bar_volume": bar.get("volume"),
+        "strategy_position_size": strategy.get("position_size"),
+        "strategy_order_action": strategy.get("order_action"),
+        "strategy_order_contracts": strategy.get("order_contracts"),
+        "strategy_order_price": strategy.get("order_price"),
+        "strategy_order_id": strategy.get("order_id"),
+        "strategy_market_position": strategy.get("market_position"),
+        "strategy_market_position_size": strategy.get("market_position_size"),
+        "strategy_prev_market_position": strategy.get("prev_market_position"),
+        "strategy_prev_market_position_size": strategy.get("prev_market_position_size"),
+        "raw_body": raw_body,
+    }
+
+    with open(csv_path, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
 
 @app.template_filter('ctime')
 def timectime(s):
@@ -125,6 +195,104 @@ def fetch_subaccounts():
         return r.json()
     except Exception:
         return []
+
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+
+    try:
+        # Get JSON from TradingView (tolerate malformed bodies so we can still log them)
+        data = request.get_json(silent=True)
+        raw_body = "" if data is not None else request.get_data(as_text=True)
+
+        log_webhook_traffic(data, raw_body)
+
+        data = data or {}
+
+        print("Received webhook:", data)
+
+        # -----------------------------
+        # 1. Security Check
+        # -----------------------------
+
+        if data.get("secret") != WEBHOOK_SECRET:
+            print("Invalid webhook secret")
+
+            return jsonify({
+                "status": "error",
+                "message": "Invalid secret"
+            }), 403
+
+        # -----------------------------
+        # 2. Parse Trade Details
+        # -----------------------------
+
+        symbol = data["symbol"].upper()
+
+        action = data["strategy"]["order_action"].upper()
+
+        try:
+            quantity = int(
+                float(
+                    data["strategy"]["order_contracts"]
+                )
+            )
+
+        except (TypeError, ValueError):
+
+            return jsonify({
+                "status": "error",
+                "message": "Invalid order quantity"
+            }), 400
+
+        # -----------------------------
+        # 3. Validate Quantity
+        # -----------------------------
+
+        if quantity <= 0:
+
+            return jsonify({
+                "status": "error",
+                "message": "Order quantity must be greater than zero"
+            }), 400
+
+        # -----------------------------
+        # 4. Validate Action
+        # -----------------------------
+
+        if action not in ["BUY", "SELL"]:
+
+            return jsonify({
+                "status": "error",
+                "message": "Invalid order action"
+            }), 400
+
+        # -----------------------------
+        # 5. Process Trade
+        # -----------------------------
+
+        print(
+            f"Processing trade: "
+            f"{action} {quantity} {symbol}"
+        )
+
+        # Your IBKR trading logic goes here
+
+        return jsonify({
+            "status": "success",
+            "symbol": symbol,
+            "action": action,
+            "quantity": quantity
+        }), 200
+
+    except Exception as e:
+
+        print("Webhook error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Internal server error"
+        }), 500
 
 
 @app.route("/switch-account", methods=['GET'])
