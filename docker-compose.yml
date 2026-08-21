@@ -11,6 +11,7 @@ services:
       - "5055:5055"
       - "5056:5056"
       - "4002:4002"
+      - "4040:4040"
     volumes:
       - ./webapp:/app/webapp
       - ./ibkr-algo-tradeapp:/app/ibkr-algo-tradeapp

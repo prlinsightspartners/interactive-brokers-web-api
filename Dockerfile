@@ -8,6 +8,17 @@ RUN apt-get install -y openjdk-17-jre-headless \
                        unzip curl procps vim net-tools \
                        python3 python3-pip python3.11-venv
 
+# Install ngrok
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates && \
+    curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+      | tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
+    echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+      > /etc/apt/sources.list.d/ngrok.list && \
+    apt-get update && \
+    apt-get install -y ngrok && \
+    rm -rf /var/lib/apt/lists/*
+
 # We will put everything in the /app directory
 WORKDIR /app
 
