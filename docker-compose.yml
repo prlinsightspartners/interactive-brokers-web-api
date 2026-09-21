@@ -7,6 +7,7 @@ services:
     environment:
       IBKR_ACCOUNT_ID: "DUO504961"
       WEBHOOK_SECRET: your_super_secret_string_123
+      NGROK_AUTHTOKEN: ${3Gp10Htnd1VZnLJILTUzycxrlKS_4XkA6f9b9qUqJq6WhcXC8}
     ports:
       - "5055:5055"
       - "5056:5056"
