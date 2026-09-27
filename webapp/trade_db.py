@@ -3,7 +3,9 @@ import sqlite3
 import time
 
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "tradelog.db")
+DATABASE_DIR = os.path.join(os.path.dirname(__file__), "database")
+os.makedirs(DATABASE_DIR, exist_ok=True)
+DATABASE_PATH = os.path.join(DATABASE_DIR, "tradelog.db")
 
 
 def ensure_database(db_path=DATABASE_PATH):

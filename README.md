@@ -201,7 +201,7 @@ The endpoint returns a JSON result like:
 
 Two SQLite databases are present:
 
-### `webapp/tradelog.db`
+### `webapp/database/tradelog.db`
 
 Created by `webapp/trade_db.py` and stores a `tradelog` table with:
 

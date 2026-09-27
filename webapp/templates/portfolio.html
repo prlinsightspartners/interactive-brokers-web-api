@@ -2,6 +2,10 @@
 
 {% block title %}Portfolio | Interactive Brokers Client Portal{% endblock %}
 
+{% block extra_head %}
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">
@@ -45,6 +49,15 @@
                 </div>
               </div>
         </div>
+    </div>
+
+    <div class="chart-panel">
+        <div class="chart-panel-title">
+            Portfolio Performance (YTD)
+            <span class="chart-panel-subtitle">Cumulative value vs. SPY benchmark</span>
+        </div>
+        <div id="performance-legend" class="chart-legend"></div>
+        <div id="performance-chart" class="performance-chart"></div>
     </div>
 
     <div class="card p-0">
@@ -96,4 +109,11 @@
     </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/portfolio_performance_chart.js') }}"></script>
+<script>
+    initPerformanceChart('performance-chart', 'performance-legend', {{ performance_chart_data|default({'portfolio': [], 'benchmark': []})|tojson }});
+</script>
 {% endblock %}
