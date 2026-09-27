@@ -56,7 +56,9 @@
                         <th class="text-end">Quantity</th>
                         <th class="text-end">Average Cost</th>
                         <th class="text-end">Current Price</th>
+                        <th class="text-end">Cost Basis</th>
                         <th class="text-end">Market Value</th>
+                        <th class="text-end">Commission</th>
                         <th class="text-end">Unrealized P&L</th>
                     </tr>
                 </thead>
@@ -72,7 +74,9 @@
                         <td class="text-end cell-mono fw-semibold">{{ item['position'] }}</td>
                         <td class="text-end cell-mono">${{ "%.2f"|format(item['avgCost']) }}</td>
                         <td class="text-end cell-mono">${{ "%.2f"|format(item['mktPrice']) }}</td>
+                        <td class="text-end cell-mono">${{ "%.2f"|format(item['costBasis']) }}</td>
                         <td class="text-end cell-mono fw-semibold">${{ "%.2f"|format(item['mktValue']) }}</td>
+                        <td class="text-end cell-mono text-muted">${{ "%.2f"|format(item['commission']) }}</td>
                         <td class="text-end">
                             <span class="badge-pill {% if item['unrealizedPnl'] >= 0 %}badge-success{% else %}badge-danger{% endif %}">
                                 {% if item['unrealizedPnl'] >= 0 %}+{% endif %}${{ "%.2f"|format(item['unrealizedPnl']) }}

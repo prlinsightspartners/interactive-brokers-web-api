@@ -2,6 +2,11 @@
 
 {% block title %}{{ contract.name }} | Interactive Brokers Client Portal{% endblock %}
 
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/contract.css') }}" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">
@@ -62,27 +67,24 @@
 
 <h2>Price History</h2>
 
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <td>Open</td>
-            <td>High</td>
-            <td>Low</td>
-            <td>Close</td>
-            <th>Volume</th>
-        </tr>
-    </thead>
-    {% for item in price_history['data']|reverse %}
-    <tr>
-        <td>{{ item['t']|ctime }}</td>
-        <td>{{ item['o'] }}</td>
-        <td>{{ item['h'] }}</td>
-        <td>{{ item['l'] }}</td>
-        <td>{{ item['c'] }}</td>
-        <td>{{ item['v'] }}</td>
-    </tr>
-    {% endfor %}
-</table>
+<div class="chart-panel">
+    <div class="chart-panel-title">OHLC Candlestick &amp; Volume</div>
+    <div id="ohlc-chart" class="ohlc-chart"></div>
+</div>
 
+<div class="chart-panel">
+    <div class="chart-panel-title">Daily Return Distribution</div>
+    <div id="distribution-stats" class="distribution-stats"></div>
+    <div class="distribution-canvas-wrapper">
+        <canvas id="return-distribution-chart"></canvas>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/contract_charts.js') }}"></script>
+<script>
+    initContractCharts({{ price_history['data']|default([])|tojson }});
+</script>
 {% endblock %}

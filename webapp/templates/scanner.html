@@ -9,11 +9,17 @@
     <p class="lead">Filter and scan the market for instruments matching your criteria.</p>
 </div>
 
-<div class="card p-4 mb-4">
+{% if error %}
+<div class="alert alert-danger">
+    <strong>Scanner Error:</strong> {{ error }}
+</div>
+{% endif %}
+
+<div class="card p-4 mb-4 scanner-toolbar-card">
     <form id="scan" action="" method="get">
-        <div class="row">
-            <div class="col col-sm-2">
-                <label>Instrument</label>
+        <div class="scanner-toolbar">
+            <div class="scanner-field">
+                <label class="scanner-label" for="instrument">Instrument</label>
                 <select id="instrument" name="instrument" class="form-select">
                     {% for key in scanner_map %}
                         <option value="{{ key }}" {% if key == request.args.get('instrument') %}selected="selected"{% endif %}>
@@ -21,54 +27,78 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col col-sm-2">
-                <label>Location</label>
-
+            <div class="scanner-field">
+                <label class="scanner-label" for="location">Location</label>
                 <select id="location" name="location" class="form-select">
                 </select>
             </div>
-            <div class="col col-sm-3">
-                <label>Filter</label>
-
+            <div class="scanner-field scanner-field-grow">
+                <label class="scanner-label" for="filter">Filter</label>
                 <select id="filter" name="filter" class="form-select">
                 </select>
             </div>
-            <div class="col col-sm-1">
-                <label>Value</label>
+            <div class="scanner-field scanner-field-narrow">
+                <label class="scanner-label" for="filter_value">Value</label>
                 <input id="filter_value" name="filter_value" class="form-control" value="{{ request.args.get('filter_value', '') }}" />
             </div>
-            <div class="col col-sm-2">
-                <label>Sort By</label>
+            <div class="scanner-field">
+                <label class="scanner-label" for="sort">Sort By</label>
                 <select id="sort" name="sort" class="form-select">
-              
                 </select>
             </div>
-            <div class="col col-sm-1">
-                <br />
+            <div class="scanner-field scanner-field-action">
                 <input type="hidden" name="submitted" value="submitted" />
-                <input type="submit" id="submit_scan" class="btn btn-success" value="Scan" />
+                <input type="submit" id="submit_scan" class="btn btn-primary" value="Run Scan" />
             </div>
         </div>
+
+        {% if market_cap_available %}
+        <div class="cap-slider-wrapper">
+            <div class="cap-slider-heading">
+                <label class="scanner-label">Market Cap Range</label>
+                <span class="cap-slider-value"><span id="cap-value-min">$1M</span> &ndash; <span id="cap-value-max">$10T</span></span>
+            </div>
+            <div class="cap-slider" id="cap-slider">
+                <div class="cap-slider-track"></div>
+                <div class="cap-slider-range" id="cap-slider-range"></div>
+                <input type="range" min="0" max="1000" value="0" class="cap-range cap-range-min" id="cap-range-min" aria-label="Minimum market cap" />
+                <input type="range" min="0" max="1000" value="1000" class="cap-range cap-range-max" id="cap-range-max" aria-label="Maximum market cap" />
+            </div>
+            <input type="hidden" id="market_cap_min" name="market_cap_min" value="{{ request.args.get('market_cap_min', '') }}" />
+            <input type="hidden" id="market_cap_max" name="market_cap_max" value="{{ request.args.get('market_cap_max', '') }}" />
+        </div>
+        {% endif %}
     </form>
 
 
-    <h3 class="mt-4">Results</h3>
+    <div class="scanner-results-heading">
+        <h3 class="mb-0">Results</h3>
+        {% if scan_results and scan_results['contracts'] %}
+        <span class="scanner-results-count">{{ scan_results['contracts']|length }} match{{ 'es' if scan_results['contracts']|length != 1 else '' }}</span>
+        {% endif %}
+    </div>
 
-    <table class="data-table">    
+    {% if scan_results and scan_results['contracts'] %}
+    <div class="chart-grid">
     {% for contract in scan_results['contracts'] %}
-        <tr>
-            <td>
-                <h4>
-                    <a href="/contract/{{ contract['con_id'] }}/365d">{{ contract['symbol'] }}</a>
-                </h4>
-                {{ contract['company_name'] }}<br />
-
-                <br />
-                <img style="width: 100%" src="https://charts2-node.finviz.com/chart.ashx?cs=l&t={{ contract['symbol'] }}&tf=d&s=linear&ct=candle_stick&tm=d&o[0][ot]=sma&o[0][op]=50&o[0][oc]=FF8F33C6&o[1][ot]=sma&o[1][op]=200&o[1][oc]=DCB3326D&o[2][ot]=sma&o[2][op]=20&o[2][oc]=DC32B363&o[3][ot]=patterns&o[3][op]=&o[3][oc]=000" />
-            </td>
-        </tr>
+        <div class="chart-tile">
+            <div class="chart-tile-header">
+                <a href="/contract/{{ contract['con_id'] }}/365d" class="chart-symbol">{{ contract['symbol'] }}</a>
+                <span class="chart-company">{{ contract['company_name'] }}</span>
+            </div>
+            <div class="chart-tile-image">
+                <img loading="lazy" src="https://charts2-node.finviz.com/chart.ashx?cs=l&t={{ contract['symbol'] }}&tf=d&s=linear&ct=candle_stick&tm=d&o[0][ot]=sma&o[0][op]=50&o[0][oc]=FF8F33C6&o[1][ot]=sma&o[1][op]=200&o[1][oc]=DCB3326D&o[2][ot]=sma&o[2][op]=20&o[2][oc]=DC32B363&o[3][ot]=patterns&o[3][op]=&o[3][oc]=000" alt="{{ contract['symbol'] }} chart" />
+            </div>
+        </div>
     {% endfor %}
-    </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <div class="empty-state-title">No results yet</div>
+        <p class="empty-state-text">Adjust your filters and run a scan to see matching instruments.</p>
+    </div>
+    {% endif %}
 
     {% if stocks %}
         <h3 class="mt-4">Companies</h3>
@@ -160,7 +190,69 @@ instrument.addEventListener('change', (event) => {
 
 instrument.dispatchEvent(new Event('change'));
 
+// Market cap slider: log scale from $1M (10^6) to $10T (10^13)
+const capMinRange = document.getElementById('cap-range-min');
+const capMaxRange = document.getElementById('cap-range-max');
 
+if (capMinRange && capMaxRange) {
+    const capRangeFill = document.getElementById('cap-slider-range');
+    const capValueMinLabel = document.getElementById('cap-value-min');
+    const capValueMaxLabel = document.getElementById('cap-value-max');
+    const capMinHidden = document.getElementById('market_cap_min');
+    const capMaxHidden = document.getElementById('market_cap_max');
+
+    const CAP_MIN_EXP = 6;
+    const CAP_MAX_EXP = 13;
+    const CAP_SLIDER_MAX = 1000;
+
+    const sliderToDollars = (pos) => Math.pow(10, CAP_MIN_EXP + (pos / CAP_SLIDER_MAX) * (CAP_MAX_EXP - CAP_MIN_EXP));
+    const dollarsToSlider = (value) => {
+        const pos = ((Math.log10(value) - CAP_MIN_EXP) / (CAP_MAX_EXP - CAP_MIN_EXP)) * CAP_SLIDER_MAX;
+        return Math.min(CAP_SLIDER_MAX, Math.max(0, Math.round(pos)));
+    };
+    const formatCap = (value) => {
+        if (value >= 1e12) return '$' + (value / 1e12).toFixed(value >= 1e13 ? 0 : 1) + 'T';
+        if (value >= 1e9) return '$' + (value / 1e9).toFixed(value >= 1e11 ? 0 : 1) + 'B';
+        return '$' + (value / 1e6).toFixed(0) + 'M';
+    };
+
+    const updateCapSlider = () => {
+        let minPos = parseInt(capMinRange.value, 10);
+        let maxPos = parseInt(capMaxRange.value, 10);
+
+        if (minPos > maxPos) {
+            [minPos, maxPos] = [maxPos, minPos];
+        }
+
+        const minDollars = sliderToDollars(minPos);
+        const maxDollars = sliderToDollars(maxPos);
+
+        capValueMinLabel.textContent = formatCap(minDollars);
+        capValueMaxLabel.textContent = formatCap(maxDollars);
+
+        capRangeFill.style.left = (minPos / CAP_SLIDER_MAX * 100) + '%';
+        capRangeFill.style.right = (100 - (maxPos / CAP_SLIDER_MAX * 100)) + '%';
+
+        // Only send a filter when the advisor has actually narrowed the default full range
+        capMinHidden.value = minPos > 0 ? (minDollars / 1e6).toFixed(2) : '';
+        capMaxHidden.value = maxPos < CAP_SLIDER_MAX ? (maxDollars / 1e6).toFixed(2) : '';
+    };
+
+    const initialMinMillions = parseFloat(urlParams.get('market_cap_min'));
+    const initialMaxMillions = parseFloat(urlParams.get('market_cap_max'));
+
+    if (!isNaN(initialMinMillions)) {
+        capMinRange.value = dollarsToSlider(initialMinMillions * 1e6);
+    }
+    if (!isNaN(initialMaxMillions)) {
+        capMaxRange.value = dollarsToSlider(initialMaxMillions * 1e6);
+    }
+
+    capMinRange.addEventListener('input', updateCapSlider);
+    capMaxRange.addEventListener('input', updateCapSlider);
+
+    updateCapSlider();
+}
 
 if (!urlParams.get('submitted')) {
     const formElement = document.getElementById('scan');
