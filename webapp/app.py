@@ -460,6 +460,9 @@ def portfolio():
     else:
         positions = []
 
+    # sort P&L book by unrealized P&L, highest first
+    positions.sort(key=lambda p: p.get("unrealizedPnl", 0), reverse=True)
+
     # return my positions, how much cash i have in this account
     return render_template("portfolio.html", positions=positions, account_id=active_account_id, accounts=accounts, selected_account_id=active_account_id)
 

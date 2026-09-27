@@ -250,6 +250,20 @@ a:hover {
     font-variant-numeric: tabular-nums;
 }
 
+.data-table.compact th,
+.data-table.compact td {
+    padding: var(--space-xs) var(--space-md);
+}
+
+.data-table.compact .cell-secondary {
+    font-size: 0.75rem;
+}
+
+.data-table.compact .badge-pill {
+    padding: 2px var(--space-sm);
+    font-size: 0.8125rem;
+}
+
 /* Badges */
 .badge-pill {
     display: inline-flex;
