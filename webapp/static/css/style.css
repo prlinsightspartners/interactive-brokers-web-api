@@ -623,3 +623,73 @@ a:hover {
         flex: 1 1 100%;
     }
 }
+
+/* Order management */
+.orders-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.order-status-filter {
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.btn-filter {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    border-radius: var(--radius-md) !important;
+    padding: 0.4rem 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-right: var(--space-xs);
+}
+
+.btn-filter:hover {
+    border-color: var(--ibkr-primary);
+    color: var(--ibkr-primary);
+}
+
+.btn-filter.active {
+    background-color: var(--ibkr-secondary);
+    border-color: var(--ibkr-secondary);
+    color: #fff;
+}
+
+.btn-filter .filter-count {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+.status-badge {
+    text-transform: capitalize;
+}
+
+.status-filled,
+.status-executed {
+    background-color: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.status-cancelled,
+.status-rejected {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger);
+}
+
+.status-submitted,
+.status-presubmitted,
+.status-pendingsubmit,
+.status-working {
+    background-color: var(--color-info-bg);
+    color: var(--color-info);
+}

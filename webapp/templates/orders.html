@@ -16,54 +16,69 @@
 </div>
 {% endif %}
 
-<table class="data-table">
-    <thead>
-    <tr>
-        <th>Order ID</th>
-        <th>Ticker</th>
-        <th>Description</th>
-        <th>Company</th>
-        <th>Order Description</th>
-        <th>Order Type</th>
-        <th>Status</th>
-        <th>Cancel</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for order in orders %}
-    <tr>
-        <td>
-            {{ order.orderId }}
-        </td>
-        <td>
-            {{ order.ticker }}
-        </td>
-        <td>
-            {{ order.description1 }}
-        </td>
-        <td>
-            {{ order.companyName }}
-        </td>
-        <td>
-            {{ order.orderDesc }}
-        </td>
-        <td>
-            {{ order.orderType }}
-        </td>
-        <td>
-            {{ order.status }}   
-        </td>
-        <td>
-            <a href="/orders/{{ order.orderId }}/cancel" class="btn btn-light">x</a><br />
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="8">No active orders</td>
-    </tr>
-    {% endfor %}
+<div class="orders-toolbar">
+    <div class="btn-group order-status-filter" role="group" aria-label="Filter orders by status">
+        <button type="button" class="btn btn-filter active" data-status="all">All <span class="filter-count">{{ orders|length }}</span></button>
+        {% for status in statuses|default([]) %}
+        <button type="button" class="btn btn-filter" data-status="{{ status }}">{{ status }} <span class="filter-count">{{ orders|selectattr('status', 'equalto', status)|list|length }}</span></button>
+        {% endfor %}
+    </div>
+</div>
 
-    </tbody>
-</table>
+<div class="card p-0">
+    <div class="table-responsive">
+        <table class="data-table mb-0" id="orders-table">
+            <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Ticker</th>
+                <th>Description</th>
+                <th>Company</th>
+                <th>Order Description</th>
+                <th>Order Type</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for order in orders %}
+            <tr data-status="{{ order.status }}">
+                <td class="cell-mono">{{ order.orderId }}</td>
+                <td class="cell-primary">{{ order.ticker }}</td>
+                <td class="cell-secondary">{{ order.description1 }}</td>
+                <td>{{ order.companyName }}</td>
+                <td>{{ order.orderDesc }}</td>
+                <td>{{ order.orderType }}</td>
+                <td>
+                    <span class="badge-pill status-badge status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
+                </td>
+                <td class="text-end">
+                    <a href="/orders/{{ order.orderId }}/cancel" class="btn btn-sm btn-outline-danger">Cancel</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">No active orders</td>
+            </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.btn-filter').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-filter').forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const status = btn.dataset.status;
+            document.querySelectorAll('#orders-table tbody tr[data-status]').forEach((row) => {
+                row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
+            });
+        });
+    });
+</script>
 
 {% endblock %}

@@ -226,6 +226,7 @@ function initContractCharts(priceHistory) {
 
     initPriceChart('ohlc-chart', sortedHistory);
     renderReturnDistribution('return-distribution-chart', 'distribution-stats', sortedHistory);
+    populateOrderPriceOptions('price', sortedHistory);
 
     let resizeTimer = null;
     window.addEventListener('resize', () => {
@@ -234,4 +235,47 @@ function initContractCharts(priceHistory) {
             renderReturnDistribution('return-distribution-chart', 'distribution-stats', sortedHistory);
         }, 150);
     });
+}
+
+// Builds a limit-price dropdown spanning +/-2 standard deviations (based on
+// daily return volatility) around the last close, in $1 increments.
+function populateOrderPriceOptions(selectId, sortedHistory) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    const spot = sortedHistory[sortedHistory.length - 1].c;
+    const returns = computeDailyReturns(sortedHistory);
+    const avg = mean(returns);
+    const sd = stdDev(returns, avg);
+    const priceStdDev = spot * sd;
+
+    const step = 1;
+    let low = Math.max(step, Math.floor(spot - 2 * priceStdDev));
+    let high = Math.ceil(spot + 2 * priceStdDev);
+    if (high <= low) {
+        high = low + step;
+    }
+
+    select.innerHTML = '';
+    let closestOption = null;
+    let closestDiff = Infinity;
+
+    for (let value = low; value <= high; value += step) {
+        const option = document.createElement('option');
+        option.value = value.toFixed(2);
+        option.textContent = `$${value.toFixed(2)}`;
+
+        const diff = Math.abs(value - spot);
+        if (diff < closestDiff) {
+            closestDiff = diff;
+            closestOption = option;
+        }
+
+        select.appendChild(option);
+    }
+
+    if (closestOption) {
+        closestOption.selected = true;
+        closestOption.textContent += ' (Spot)';
+    }
 }

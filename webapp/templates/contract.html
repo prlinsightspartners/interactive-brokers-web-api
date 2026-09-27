@@ -16,8 +16,10 @@
 
 <div class="row mb-5">
     <div class="col col-sm-9">
-        <h3>{{ contract.ticker }}</h3>
-        <img style="width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--color-border);" src="https://charts2-node.finviz.com/chart.ashx?cs=l&t={{ contract.ticker }}&tf=d&s=linear&ct=candle_stick&tm=d&o[0][ot]=sma&o[0][op]=50&o[0][oc]=FF8F33C6&o[1][ot]=sma&o[1][op]=200&o[1][oc]=DCB3326D&o[2][ot]=sma&o[2][op]=20&o[2][oc]=DC32B363&o[3][ot]=patterns&o[3][op]=&o[3][oc]=000" />
+        <div class="chart-panel mb-0">
+            <div class="chart-panel-title">{{ contract.ticker }} &middot; OHLC Candlestick &amp; Volume</div>
+            <div id="ohlc-chart" class="ohlc-chart"></div>
+        </div>
     </div>
 
 
@@ -38,7 +40,9 @@
             <input name="quantity" type="number" min="1" step="1" class="form-control" required />
             <div id="limit-price-field">
                 Price
-                <input id="price" name="price" type="number" min="0.01" step="0.01" class="form-control" required />
+                <select id="price" name="price" class="form-select" required>
+                    <option value="">Loading prices&hellip;</option>
+                </select>
             </div>
             <input name="contract_id" type="hidden" value="{{ contract.conid }}"/>
             <input name="ticker" type="hidden" value="{{ contract.ticker }}"/>
@@ -65,12 +69,7 @@
     });
 </script>
 
-<h2>Price History</h2>
-
-<div class="chart-panel">
-    <div class="chart-panel-title">OHLC Candlestick &amp; Volume</div>
-    <div id="ohlc-chart" class="ohlc-chart"></div>
-</div>
+<h2>Daily Return Distribution</h2>
 
 <div class="chart-panel">
     <div class="chart-panel-title">Daily Return Distribution</div>
