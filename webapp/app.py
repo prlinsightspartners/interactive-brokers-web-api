@@ -1,7 +1,16 @@
 import requests, time, os, random, json
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, session, jsonify
-from trade_db import ensure_database, upsert_trade
+
+from trade_db import (
+    create_order_record,
+    ensure_database,
+    get_trackable_orders,
+    get_order_history,
+    update_order_record,
+    update_order_record_by_ibkr_id,
+    upsert_trade,
+)
 from portfolio_db import (
     ensure_portfolio_database,
     upsert_account_metadata,
@@ -96,7 +105,12 @@ def first_order_response(response_json):
     return {}
 
 
-def record_submitted_order(account_id, submitted_order, response_json):
+def record_submitted_order(account_id, submitted_order, response_json, order_record_id, http_status=None):
+    update_order_record(
+        order_record_id,
+        response_json=response_json,
+        http_status=http_status,
+    )
     ibkr_response = first_order_response(response_json)
     order_id = (
         ibkr_response.get('order_id')
@@ -104,7 +118,7 @@ def record_submitted_order(account_id, submitted_order, response_json):
         or ibkr_response.get('id')
     )
     if not order_id:
-        print("IBKR did not return an order identifier; order was not added to the trade log")
+        print("IBKR did not return an order identifier; order remains tracked locally")
         return
 
     ticker = request.form.get('ticker', '')
@@ -135,6 +149,8 @@ def record_live_orders(account_id, orders):
         order_id = order.get('orderId') or order.get('order_id')
         if not order_id:
             continue
+
+        update_order_record_by_ibkr_id(account_id, order_id, order)
 
         upsert_trade(
             account_id=account_id,
@@ -458,17 +474,99 @@ def dashboard():
 
 @app.route("/lookup")
 def lookup():
-    symbol = request.args.get('symbol', None)
+    symbol = request.args.get('symbol', '').strip()
+    asset_class = request.args.get('asset_class', '')
+    exchange = request.args.get('exchange', '').strip().upper()
+    asset_classes = {
+        '': 'All asset classes',
+        'STK': 'Equities & ETFs',
+        'FUND': 'Mutual funds',
+        'FUT': 'Futures',
+        'CASH': 'Currencies',
+        'CMDTY': 'Commodities',
+        'OPT': 'Options',
+        'FOP': 'Futures options',
+        'BOND': 'Bonds',
+        'IND': 'Indices',
+        'CFD': 'CFDs',
+    }
+    exchange_groups = {
+        'United States': [
+            ('NASDAQ', 'NASDAQ'),
+            ('NYSE', 'New York Stock Exchange (NYSE)'),
+            ('ARCA', 'NYSE Arca'),
+            ('AMEX', 'NYSE American (AMEX)'),
+            ('BATS', 'Cboe BZX (BATS)'),
+            ('IEX', 'Investors Exchange (IEX)'),
+            ('PINK', 'OTC Pink'),
+            ('OTC', 'Over-the-counter (OTC)'),
+        ],
+        'Futures': [
+            ('CME', 'CME'),
+            ('CBOT', 'CBOT'),
+            ('NYMEX', 'NYMEX'),
+            ('COMEX', 'COMEX'),
+            ('ICEUS', 'ICE US'),
+        ],
+        'International': [
+            ('LSE', 'London Stock Exchange (LSE)'),
+            ('AEB', 'Euronext Amsterdam (AEB)'),
+            ('IBIS', 'Xetra (IBIS)'),
+            ('TSE', 'Toronto Stock Exchange (TSE)'),
+            ('TSX', 'TSX Venture Exchange (TSX)'),
+            ('SEHK', 'Hong Kong Stock Exchange (SEHK)'),
+            ('ASX', 'Australian Securities Exchange (ASX)'),
+            ('NSE', 'National Stock Exchange of India (NSE)'),
+            ('SGX', 'Singapore Exchange (SGX)'),
+        ],
+        'Currencies': [
+            ('IDEALPRO', 'IDEALPRO'),
+        ],
+    }
+    exchange_codes = {
+        code for options in exchange_groups.values() for code, _ in options
+    }
+    if asset_class not in asset_classes:
+        asset_class = ''
+    if exchange not in exchange_codes:
+        exchange = ''
+
     stocks = []
     accounts = fetch_subaccounts()
 
-    if symbol is not None:
-        r = requests.get(f"{BASE_API_URL}/iserver/secdef/search?symbol={symbol}&name=true", verify=False)
-
+    if symbol:
+        params = {'symbol': symbol, 'name': 'true'}
+        if asset_class:
+            params['secType'] = asset_class
+        r = requests.get(
+            f"{BASE_API_URL}/iserver/secdef/search",
+            params=params,
+            verify=False
+        )
         response = r.json()
-        stocks = response
+        if isinstance(response, list):
+            stocks = response
+            if exchange:
+                stocks = [
+                    stock for stock in stocks
+                    if any(
+                        str(section.get('exchange', '')).upper() == exchange
+                        for section in stock.get('sections', [])
+                    )
+                ]
 
-    return render_template("lookup.html", stocks=stocks, accounts=accounts, selected_account_id=get_active_account_id())
+    return render_template(
+        "lookup.html",
+        stocks=stocks,
+        symbol=symbol,
+        asset_class=asset_class,
+        asset_classes=asset_classes,
+        exchange_groups=exchange_groups,
+        exchange=exchange,
+        searched=bool(symbol),
+        accounts=accounts,
+        selected_account_id=get_active_account_id()
+    )
 
 
 @app.route("/contract/<contract_id>/<period>")
@@ -482,19 +580,113 @@ def contract(contract_id, period='5d', bar='1d'):
     r = requests.post(f"{BASE_API_URL}/trsrv/secdef", data=data, verify=False)
     contract = r.json()['secdef'][0]
 
+    fundamental_fields = [
+        ('Market capitalization', {'marketcap', 'marketcapitalization', 'mktcap', 'mktcapmil', 'mkcap'}),
+        ('P/E ratio', {'pe', 'peratio', 'pricetoearnings', 'priceearningsratio', 'peexclxor', 'peexclxorttm', 'ttmpe'}),
+        ('Forward P/E', {'forwardpe', 'forwardperatio', 'fwdeps'}),
+        ('EPS (TTM)', {'eps', 'ttmeps', 'ttmepsxordiluted', 'dilutedttmeps', 'epsdiluted', 'earningspershare'}),
+        ('Dividend yield', {'dividendyield', 'divyield', 'ttmyield', 'ttmdividendyield'}),
+        ('Annual dividend per share', {'dividendpershare', 'annualdividend', 'dividend'}),
+        ('Price / book', {'pricetobook', 'pricetobookratio', 'price2bk', 'p2b', 'ptb'}),
+        ('Price / sales', {'pricetosales', 'pricetosalesratio', 'price2sales', 'p2s'}),
+        ('Beta', {'beta', 'betavalue'}),
+        ('52-week high', {'52weekhigh', 'week52high', 'high52week', 'high52'}),
+        ('52-week low', {'52weeklow', 'week52low', 'low52week', 'low52'}),
+        ('Return on equity', {'roe', 'returnonequity'}),
+        ('Profit margin', {'profitmargin', 'netprofitmargin'}),
+    ]
+
+    def normalize_metric_key(value):
+        return ''.join(character for character in str(value).lower() if character.isalnum())
+
+    def extract_fundamental_values(payload):
+        aliases = {
+            alias: label
+            for label, field_aliases in fundamental_fields
+            for alias in field_aliases
+        }
+        values = {}
+
+        def visit(item):
+            if isinstance(item, dict):
+                metric_name = next(
+                    (item.get(key) for key in ('name', 'label', 'metric', 'key') if item.get(key)),
+                    None
+                )
+                if metric_name:
+                    label = aliases.get(normalize_metric_key(metric_name))
+                    metric_value = next(
+                        (item.get(key) for key in ('value', 'rawValue', 'displayValue') if item.get(key) is not None),
+                        None
+                    )
+                    if label and metric_value is not None:
+                        values.setdefault(label, str(metric_value))
+
+                for key, value in item.items():
+                    label = aliases.get(normalize_metric_key(key))
+                    if label and not isinstance(value, (dict, list)) and value is not None:
+                        values.setdefault(label, str(value))
+                    visit(value)
+            elif isinstance(item, list):
+                for value in item:
+                    visit(value)
+
+        visit(payload)
+        return [
+            {'label': label, 'value': values.get(label)}
+            for label, _ in fundamental_fields
+        ]
+
+    contract_type = str(
+        contract.get('assetClass') or contract.get('secType') or contract.get('type') or ''
+    ).upper()
+    show_fundamentals = contract_type in {'STK', 'STOCK', 'ETF'}
+    fundamentals = []
+    if show_fundamentals:
+        try:
+            fundamentals_response = requests.get(
+                f"{BASE_API_URL}/iserver/fundamentals/{contract_id}/metrics",
+                params={'type': 'ReportSnapshot'},
+                verify=False
+            )
+            if fundamentals_response.ok:
+                fundamentals = extract_fundamental_values(fundamentals_response.json())
+        except (requests.RequestException, ValueError, TypeError) as exc:
+            print(f"Unable to load fundamentals for {contract_id}: {exc}")
+
     r = requests.get(f"{BASE_API_URL}/iserver/marketdata/history?conid={contract_id}&period={period}&bar={bar}", verify=False)
     price_history = r.json()
 
     accounts = fetch_subaccounts()
-    return render_template("contract.html", price_history=price_history, contract=contract, accounts=accounts, selected_account_id=get_active_account_id())
+    fundamentals_available = any(metric['value'] is not None for metric in fundamentals)
+    return render_template(
+        "contract.html",
+        price_history=price_history,
+        contract=contract,
+        show_fundamentals=show_fundamentals,
+        fundamentals=fundamentals,
+        fundamentals_available=fundamentals_available,
+        accounts=accounts,
+        selected_account_id=get_active_account_id()
+    )
 
 
 @app.route("/orders")
 def orders():
     active_account_id = get_active_account_id()
     accounts = fetch_subaccounts()
+    history_windows = (7, 30, 90, 180, 365)
+    try:
+        selected_days = int(request.args.get("days", 30))
+    except (TypeError, ValueError):
+        selected_days = 30
+    if selected_days not in history_windows:
+        selected_days = 30
+
     print("== fetching orders ==")
     print("Account_ID used for fetching orders: ", active_account_id)
+    live_orders = []
+    error_msg = None
 
     try:
         # Switch the active account first for financial advisor / multi-account structures
@@ -506,30 +698,115 @@ def orders():
         if switch_response.status_code >= 400:
             error_msg = f"Failed to switch account with status {switch_response.status_code}: {switch_response.text}"
             print(error_msg)
-            return render_template("orders.html", orders=[], error=error_msg, accounts=accounts, selected_account_id=active_account_id)
-
-        r = requests.get(f"{BASE_API_URL}/iserver/account/orders", verify=False)
-        print(f"Orders Response Status: {r.status_code}")
-        print(f"Orders Response: {r.text}")
-        
-        if r.status_code >= 400:
-            error_msg = f"Failed to fetch orders with status {r.status_code}: {r.text}"
-            print(error_msg)
-            return render_template("orders.html", orders=[], error=error_msg, accounts=accounts, selected_account_id=active_account_id)
-
-        if r.text:
-            orders = r.json()["orders"]
-            record_live_orders(active_account_id, orders)
         else:
-            orders = []
-            print("No orders returned from IBKR")
+            response = requests.get(f"{BASE_API_URL}/iserver/account/orders", verify=False)
+            print(f"Orders Response Status: {response.status_code}")
+            print(f"Orders Response: {response.text}")
+
+            if response.status_code >= 400:
+                error_msg = f"Failed to fetch orders with status {response.status_code}: {response.text}"
+                print(error_msg)
+            elif response.content:
+                response_data = response.json()
+                live_orders = response_data.get("orders", []) if isinstance(response_data, dict) else []
+                if isinstance(live_orders, list):
+                    record_live_orders(active_account_id, live_orders)
+                else:
+                    live_orders = []
+            else:
+                print("No live orders returned from IBKR")
+
+            if response.status_code < 400:
+                live_order_ids = {
+                    str(order.get("orderId") or order.get("order_id"))
+                    for order in live_orders
+                    if order.get("orderId") or order.get("order_id")
+                }
+                for tracked_order in get_trackable_orders(active_account_id):
+                    order_id = str(tracked_order["ibkr_order_id"])
+                    if order_id in live_order_ids:
+                        continue
+                    try:
+                        status_response = requests.get(
+                            f"{BASE_API_URL}/iserver/account/order/status/{order_id}",
+                            verify=False
+                        )
+                        if status_response.status_code < 400 and status_response.content:
+                            update_order_record(
+                                tracked_order["id"],
+                                response_json=status_response.json(),
+                                http_status=status_response.status_code,
+                            )
+                    except Exception as e:
+                        print(f"Unable to refresh status for IBKR order {order_id}: {e}")
 
     except Exception as e:
         error_msg = f"Error fetching orders: {str(e)}"
         print(error_msg)
-        return render_template("orders.html", orders=[], error=error_msg, accounts=accounts, selected_account_id=active_account_id)
 
-    return render_template("orders.html", orders=orders, statuses=sorted({o.get("status", "") for o in orders if o.get("status")}), account_id=active_account_id, accounts=accounts, selected_account_id=active_account_id)
+    display_orders = {}
+    for record in get_order_history(active_account_id, selected_days):
+        order_id = str(record["ibkr_order_id"] or f"Local-{record['id']}")
+        quantity = record["quantity"] or 0
+        action = record["action"] or ""
+        ticker = record["ticker"] or (f"Conid {record['conid']}" if record["conid"] else "")
+        order_description = f"{action} {quantity:g} {ticker}".strip()
+        if record["error_message"]:
+            order_description = record["error_message"]
+        display_orders[order_id] = {
+            "orderId": order_id,
+            "ticker": ticker,
+            "description1": record["description"],
+            "companyName": record["company"],
+            "orderDesc": order_description,
+            "orderType": record["order_type"],
+            "status": record["status"],
+            "side": action,
+            "totalSize": quantity,
+            "price": record["price"],
+            "filledQuantity": record["filled_quantity"],
+            "avgPrice": record["average_fill_price"],
+            "createdAt": datetime.fromtimestamp(record["created_at"] / 1000).strftime("%Y-%m-%d %H:%M"),
+            "sortTimestamp": record["created_at"],
+            "errorMessage": record["error_message"],
+        }
+
+    for order in live_orders:
+        live_order_id = order.get("orderId") or order.get("order_id")
+        if not live_order_id:
+            continue
+        order_id = str(live_order_id)
+        if order_id not in display_orders:
+            display_orders[order_id] = {
+                "orderId": order_id,
+                "ticker": order.get("ticker", ""),
+                "description1": order.get("description1", ""),
+                "companyName": order.get("companyName", ""),
+                "orderDesc": order.get("orderDesc", ""),
+                "orderType": order.get("orderType", ""),
+                "status": order.get("status", ""),
+                "side": order.get("side", ""),
+                "totalSize": order.get("totalSize") or order.get("quantity") or 0,
+                "price": order.get("price") or order.get("limit_price"),
+                "filledQuantity": order.get("filledQuantity", 0),
+                "avgPrice": order.get("avgPrice"),
+                "createdAt": order.get("order_time", ""),
+                "sortTimestamp": 0,
+                "errorMessage": "",
+            }
+
+    orders = sorted(display_orders.values(), key=lambda order: order["sortTimestamp"], reverse=True)
+    return render_template(
+        "orders.html",
+        orders=orders,
+        statuses=sorted({order.get("status", "") for order in orders if order.get("status")}),
+        account_id=active_account_id,
+        history_windows=history_windows,
+        selected_days=selected_days,
+        error=error_msg,
+        accounts=accounts,
+        selected_account_id=active_account_id,
+    )
 
 
 @app.route("/limit_order", methods=['POST'])
@@ -552,6 +829,14 @@ def place_order():
     }
 
     print(f"Order payload: {data}")
+
+    order_record_id = create_order_record(
+        active_account_id,
+        data,
+        ticker=request.form.get('ticker', ''),
+        description=request.form.get('description', ''),
+        company=request.form.get('company', ''),
+    )
     
     try:
         r = requests.post(f"{BASE_API_URL}/iserver/account/{active_account_id}/orders", json=data, verify=False)
@@ -562,16 +847,28 @@ def place_order():
         if r.status_code >= 400:
             error_msg = f"Order submission failed with status {r.status_code}: {r.text}"
             print(error_msg)
+            update_order_record(
+                order_record_id,
+                response_json={"body": r.text},
+                status="Rejected",
+                error_message=error_msg,
+                http_status=r.status_code,
+            )
             return render_template("orders.html", orders=[], error=error_msg)
         
         response_json = r.json()
         response_json = confirm_ibkr_warnings(response_json)
-        record_submitted_order(active_account_id, data['orders'][0], response_json)
+        record_submitted_order(active_account_id, data['orders'][0], response_json, order_record_id, r.status_code)
         print(f"Order response JSON: {response_json}")
         
     except Exception as e:
         error_msg = f"Error placing order: {str(e)}"
         print(error_msg)
+        update_order_record(
+            order_record_id,
+            status="SubmissionFailed",
+            error_message=error_msg,
+        )
         return render_template("orders.html", orders=[], error=error_msg)
 
     return redirect("/orders")
@@ -597,6 +894,14 @@ def place_market_order():
 
     print(f"Order payload: {data}")
 
+    order_record_id = create_order_record(
+        active_account_id,
+        data,
+        ticker=request.form.get('ticker', ''),
+        description=request.form.get('description', ''),
+        company=request.form.get('company', ''),
+    )
+
     try:
         r = requests.post(f"{BASE_API_URL}/iserver/account/{active_account_id}/orders", json=data, verify=False)
         print(f"IBKR Response Status: {r.status_code}")
@@ -605,16 +910,28 @@ def place_market_order():
         if r.status_code >= 400:
             error_msg = f"Order submission failed with status {r.status_code}: {r.text}"
             print(error_msg)
+            update_order_record(
+                order_record_id,
+                response_json={"body": r.text},
+                status="Rejected",
+                error_message=error_msg,
+                http_status=r.status_code,
+            )
             return render_template("orders.html", orders=[], error=error_msg)
 
         response_json = r.json()
         response_json = confirm_ibkr_warnings(response_json)
-        record_submitted_order(active_account_id, data['orders'][0], response_json)
+        record_submitted_order(active_account_id, data['orders'][0], response_json, order_record_id, r.status_code)
         print(f"Order response JSON: {response_json}")
 
     except Exception as e:
         error_msg = f"Error placing order: {str(e)}"
         print(error_msg)
+        update_order_record(
+            order_record_id,
+            status="SubmissionFailed",
+            error_message=error_msg,
+        )
         return render_template("orders.html", orders=[], error=error_msg)
 
     return redirect("/orders")
@@ -625,14 +942,34 @@ def cancel_order(order_id):
     active_account_id = get_active_account_id()
     cancel_url = f"{BASE_API_URL}/iserver/account/{active_account_id}/order/{order_id}"
     r = requests.delete(cancel_url, verify=False)
+    try:
+        response_json = r.json()
+    except ValueError:
+        response_json = {"body": r.text}
+    update_order_record_by_ibkr_id(
+        active_account_id,
+        order_id,
+        response_json,
+        status="PendingCancel" if r.status_code < 400 else None,
+        error_message=None if r.status_code < 400 else r.text,
+        http_status=r.status_code,
+    )
 
-    return r.json()
+    return response_json
 
 
 @app.route("/portfolio")
 def portfolio():
     active_account_id = get_active_account_id()
     accounts = fetch_subaccounts()
+
+    summary_response = requests.get(
+        f"{BASE_API_URL}/portfolio/{active_account_id}/summary",
+        verify=False
+    )
+    summary = summary_response.json() if summary_response.content else {}
+    cash_balance = _summary_amount(summary, "totalcashvalue")
+    portfolio_value = _summary_amount(summary, "netliquidation")
 
     r = requests.get(f"{BASE_API_URL}/portfolio/{active_account_id}/positions/0", verify=False)
 
@@ -664,6 +1001,10 @@ def portfolio():
     return render_template(
         "portfolio.html",
         positions=positions,
+        cash_balance=cash_balance,
+        portfolio_value=portfolio_value,
+        securities_value=sum(item.get("mktValue", 0) for item in positions),
+        has_portfolio=bool(positions) or cash_balance != 0 or portfolio_value != 0,
         account_id=active_account_id,
         accounts=accounts,
         selected_account_id=active_account_id,

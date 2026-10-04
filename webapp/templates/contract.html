@@ -69,6 +69,26 @@
     });
 </script>
 
+{% if show_fundamentals %}
+<section class="mb-5">
+    <h3>Fundamentals</h3>
+    {% if fundamentals_available %}
+    <div class="row row-cols-2 row-cols-md-4 g-3">
+        {% for metric in fundamentals %}
+        <div class="col">
+            <dl class="mb-2 border-bottom pb-2 h-100">
+                <dt class="small text-muted fw-normal">{{ metric.label }}</dt>
+                <dd class="mb-0 fw-semibold">{% if metric.value is not none %}{{ metric.value }}{% else %}&mdash;{% endif %}</dd>
+            </dl>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Fundamental data is not available from IBKR for this instrument.</p>
+    {% endif %}
+</section>
+{% endif %}
+
 <h2>Daily Return Distribution</h2>
 
 <div class="chart-panel">

@@ -13,7 +13,7 @@
     <p class="lead">Overview of your account positions, market value, and unrealized performance.</p>
 </div>
 
-{% if positions %}
+{% if has_portfolio %}
     {% set total_value = positions|sum(attribute='mktValue') %}
     {% set total_pnl = positions|sum(attribute='unrealizedPnl') %}
 
@@ -21,7 +21,7 @@
         <div class="col-md-4">
             <div class="card metric-card">
                 <div>
-                    <div class="metric-label">Total Market Value</div>
+                    <div class="metric-label">Securities Market Value</div>
                     <div class="metric-value">${{ "%.2f"|format(total_value) }}</div>
                     <div class="metric-change text-muted">Across {{ positions|length }} position{{ 's' if positions|length != 1 else '' }}</div>
                 </div>
@@ -97,7 +97,24 @@
                         </td>
                     </tr>
                     {% endfor %}
+                    <tr>
+                        <td><div class="cell-primary">Cash position</div></td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                        <td class="text-end cell-mono fw-semibold">${{ "%.2f"|format(cash_balance) }}</td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                        <td class="text-end cell-mono">&mdash;</td>
+                    </tr>
                 </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="5" class="text-end">Portfolio Total (Net Liquidation)</th>
+                        <th class="text-end cell-mono">${{ "%.2f"|format(portfolio_value) }}</th>
+                        <th colspan="2"></th>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -105,7 +122,7 @@
     <div class="empty-state">
         <div class="empty-state-icon">📂</div>
         <div class="empty-state-title">No positions found</div>
-        <p class="empty-state-text">Your portfolio is currently empty. Place an order or check back once your account has holdings.</p>
+        <p class="empty-state-text">Your account has no cash balance or positions to display.</p>
     </div>
 {% endif %}
 

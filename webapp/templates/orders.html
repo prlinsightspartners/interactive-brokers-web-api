@@ -2,11 +2,15 @@
 
 {% block title %}Orders | Interactive Brokers Client Portal{% endblock %}
 
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/orders.css') }}" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">
     <h2>Orders for Account ID: {{ account_id }}</h2>
-    <p class="lead">Review and manage your active orders.</p>
+    <p class="lead">Recent orders, including completed and canceled activity.</p>
 </div>
 
 {% if error %}
@@ -17,6 +21,14 @@
 {% endif %}
 
 <div class="orders-toolbar">
+    <form method="get" action="/orders" class="d-flex align-items-center gap-2">
+        <label for="order-history-days" class="form-label mb-0">History</label>
+        <select id="order-history-days" name="days" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for days in history_windows %}
+            <option value="{{ days }}" {% if days == selected_days %}selected{% endif %}>Last {{ days }} days</option>
+            {% endfor %}
+        </select>
+    </form>
     <div class="btn-group order-status-filter" role="group" aria-label="Filter orders by status">
         <button type="button" class="btn btn-filter active" data-status="all">All <span class="filter-count">{{ orders|length }}</span></button>
         {% for status in statuses|default([]) %}
@@ -26,16 +38,20 @@
 </div>
 
 <div class="card p-0">
-    <div class="table-responsive">
-        <table class="data-table mb-0" id="orders-table">
+    <div class="orders-table-scroll">
+        <table class="data-table compact mb-0" id="orders-table">
             <thead>
             <tr>
                 <th>Order ID</th>
+                <th>Created</th>
                 <th>Ticker</th>
                 <th>Description</th>
                 <th>Company</th>
                 <th>Order Description</th>
                 <th>Order Type</th>
+                <th class="text-end">Quantity</th>
+                <th class="text-end">Limit Price</th>
+                <th class="text-end">Filled</th>
                 <th>Status</th>
                 <th class="text-end">Action</th>
             </tr>
@@ -44,21 +60,29 @@
             {% for order in orders %}
             <tr data-status="{{ order.status }}">
                 <td class="cell-mono">{{ order.orderId }}</td>
+                <td class="cell-mono">{{ order.createdAt or '&mdash;'|safe }}</td>
                 <td class="cell-primary">{{ order.ticker }}</td>
                 <td class="cell-secondary">{{ order.description1 }}</td>
                 <td>{{ order.companyName }}</td>
                 <td>{{ order.orderDesc }}</td>
                 <td>{{ order.orderType }}</td>
+                <td class="text-end cell-mono">{{ order.totalSize or 0 }}</td>
+                <td class="text-end cell-mono">{% if order.price is not none %}${{ "%.2f"|format(order.price|float) }}{% else %}&mdash;{% endif %}</td>
+                <td class="text-end cell-mono">{{ order.filledQuantity or 0 }}{% if order.avgPrice %} @ ${{ "%.2f"|format(order.avgPrice|float) }}{% endif %}</td>
                 <td>
                     <span class="badge-pill status-badge status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
                 </td>
                 <td class="text-end">
+                    {% if order.orderId[:6] != 'Local-' and order.status in ['PendingSubmit', 'PreSubmitted', 'Submitted', 'PartiallyFilled'] %}
                     <a href="/orders/{{ order.orderId }}/cancel" class="btn btn-sm btn-outline-danger">Cancel</a>
+                    {% else %}
+                    &mdash;
+                    {% endif %}
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="8" class="text-center text-muted py-4">No active orders</td>
+                <td colspan="12" class="text-center text-muted py-4">No orders found for the selected period.</td>
             </tr>
             {% endfor %}
 

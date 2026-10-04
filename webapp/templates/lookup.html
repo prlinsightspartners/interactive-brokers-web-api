@@ -10,17 +10,44 @@
 </div>
 
 <div class="col col-sm-8">
-    <label>Enter a Stock Symbol</label>
-
-    <form action="" method="get">
-        <div class="input-group mb-3 mt-3">
-            <input name="symbol" type="text" class="form-control" placeholder="eg. AAPL">
-            <button class="btn btn-outline-secondary" type="submit">Lookup</button>
+    <form action="" method="get" class="mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="asset-class" class="form-label">Asset class</label>
+                <select id="asset-class" name="asset_class" class="form-select">
+                    {% for value, label in asset_classes.items() %}
+                    <option value="{{ value }}" {% if value == asset_class %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="exchange" class="form-label">Exchange</label>
+                <select id="exchange" name="exchange" class="form-select">
+                    <option value="">Any exchange</option>
+                    {% for group, options in exchange_groups.items() %}
+                    <optgroup label="{{ group }}">
+                        {% for value, label in options %}
+                        <option value="{{ value }}" {% if value == exchange %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="symbol" class="form-label">Symbol or company name</label>
+                <input id="symbol" name="symbol" type="text" class="form-control" placeholder="e.g. AAPL" value="{{ symbol }}" required>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit">Lookup</button>
+            </div>
+            <div class="col-12">
+                <p class="form-text mb-0">Exchange choices use IBKR venue codes. ETFs are grouped with equities by IBKR.</p>
+            </div>
         </div>
     </form>
 
     {% if stocks %}
-        <h3>Companies</h3>
+        <h3>Matching instruments</h3>
 
         <table class="table table-striped">
             {% for stock in stocks %}
@@ -34,7 +61,8 @@
             </tr>
             {% endfor %}
         </table>
-
+    {% elif searched %}
+        <p class="text-muted">No instruments matched this symbol and filter combination.</p>
     {% endif %}
 </div>
 
