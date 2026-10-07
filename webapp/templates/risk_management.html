@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+
+{% block title %}Risk Management | Interactive Brokers Client Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Risk Management</h2>
+    <p class="lead">Portfolio exposures and indicative systematic and idiosyncratic market risk for account {{ selected_account_id }}.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    <strong>Risk analysis could not be loaded.</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if analysis %}
+    {% if analysis.warnings %}
+    <div class="alert alert-warning" role="alert">
+        <strong>Interpret with care</strong>
+        <ul class="mb-0 mt-2">
+            {% for warning in analysis.warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if history_errors %}
+    <div class="alert alert-warning" role="alert">
+        Historical prices were unavailable for {{ history_errors|length }} request{{ 's' if history_errors|length != 1 else '' }}.
+        Those holdings may be omitted from the factor model, reducing modeled coverage.
+        {% for history_error in history_errors[:3] %}
+        <div class="small mt-1">{{ history_error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div>
+                    <div class="metric-label">Net Liquidation</div>
+                    <div class="metric-value">${{ "%.2f"|format(analysis.portfolio_value) }}</div>
+                    <div class="metric-change text-muted">IBKR account value</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div>
+                    <div class="metric-label">Gross Position Exposure</div>
+                    <div class="metric-value">${{ "%.2f"|format(analysis.gross_exposure) }}</div>
+                    <div class="metric-change text-muted">
+                        {% if analysis.gross_leverage_pct is not none %}
+                        {{ "%.1f"|format(analysis.gross_leverage_pct) }}% of net liquidation
+                        {% else %}
+                        Leverage unavailable
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div>
+                    <div class="metric-label">Modeled Exposure Coverage</div>
+                    <div class="metric-value">{{ "%.1f"|format(analysis.modeled_coverage_pct) }}%</div>
+                    <div class="metric-change text-muted">{{ analysis.modeled_position_count }} of {{ analysis.position_count }} positions</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card h-100">
+                <div>
+                    <div class="metric-label">1-Day 95% VaR</div>
+                    <div class="metric-value">
+                        {% if analysis.metrics %}${{ "%.2f"|format(analysis.metrics.one_day_var_95) }}{% else %}&mdash;{% endif %}
+                    </div>
+                    <div class="metric-change text-muted">Parametric estimate, not a maximum-loss limit</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-7">
+            <div class="card p-4 h-100">
+                <h3 class="h5 mb-3">Systematic vs. idiosyncratic risk</h3>
+                {% if analysis.metrics %}
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="metric-label">Annualized portfolio volatility</div>
+                        <div class="fs-4 fw-semibold">{{ "%.2f"|format(analysis.metrics.total_volatility * 100) }}%</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="metric-label">Beta to SPY</div>
+                        <div class="fs-4 fw-semibold">{{ "%.2f"|format(analysis.metrics.beta) }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="metric-label">Systematic volatility</div>
+                        <div class="fs-4 fw-semibold">{{ "%.2f"|format(analysis.metrics.systematic_volatility * 100) }}%</div>
+                        <div class="small text-muted">Portfolio movement associated with SPY in the fitted single-factor model.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="metric-label">Idiosyncratic volatility</div>
+                        <div class="fs-4 fw-semibold">{{ "%.2f"|format(analysis.metrics.idiosyncratic_volatility * 100) }}%</div>
+                        <div class="small text-muted">Residual annualized volatility not explained by SPY.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="metric-label">Model R-squared</div>
+                        <div class="fs-5 fw-semibold">{{ "%.1f"|format(analysis.metrics.r_squared * 100) }}%</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="metric-label">Daily observations</div>
+                        <div class="fs-5 fw-semibold">{{ analysis.metrics.observations }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">The factor model is unavailable. Review the history coverage warnings above; exposure and concentration figures remain available.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card p-4 h-100">
+                <h3 class="h5 mb-3">Asset-class exposure</h3>
+                {% if analysis.asset_classes %}
+                    {% for item in analysis.asset_classes %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>{{ item.name }}</span>
+                            <span>${{ "%.2f"|format(item.gross_value) }} &middot; {{ "%.1f"|format(item.gross_weight_pct) }}%</span>
+                        </div>
+                        <div class="progress" role="progressbar" aria-label="{{ item.name }} gross exposure" aria-valuenow="{{ item.gross_weight_pct|round(1) }}" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar bg-danger" style="width: {{ item.gross_weight_pct }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-muted mb-0">No non-zero position exposures are available.</p>
+                {% endif %}
+                {% if analysis.positions %}
+                <hr>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="metric-label">Largest position</div>
+                        <div class="fs-5 fw-semibold">{{ "%.1f"|format(analysis.largest_position_gross_weight_pct) }}%</div>
+                        <div class="small text-muted">{{ analysis.positions[0].symbol }} of gross exposure</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="metric-label">Top five positions</div>
+                        <div class="fs-5 fw-semibold">{{ "%.1f"|format(analysis.top_five_gross_weight_pct) }}%</div>
+                        <div class="small text-muted">Combined gross exposure</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-0 mb-4">
+        <div class="p-4 pb-2">
+            <h3 class="h5 mb-1">Position-level exposure and factor estimates</h3>
+            <p class="small text-muted mb-0">Sorted by gross market value. Position weights use market value; negative values denote short market value. Volatility columns are standalone position estimates and are not additive.</p>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table compact mb-0">
+                <thead>
+                    <tr>
+                        <th>Instrument</th>
+                        <th>Asset class</th>
+                        <th class="text-end">Market value</th>
+                        <th class="text-end">Gross weight</th>
+                        <th class="text-end">Net weight</th>
+                        <th class="text-end">SPY beta</th>
+                        <th class="text-end">Beta-adjusted weight</th>
+                        <th class="text-end">Systematic volatility</th>
+                        <th class="text-end">Idiosyncratic volatility</th>
+                        <th class="text-end">Annualized volatility</th>
+                        <th class="text-end">Observations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in analysis.positions %}
+                    <tr>
+                        <td>
+                            <div class="cell-primary">{{ item.symbol }}</div>
+                            {% if item.description %}<div class="cell-secondary">{{ item.description }}</div>{% endif %}
+                        </td>
+                        <td>{{ item.asset_class }}</td>
+                        <td class="text-end cell-mono">${{ "%.2f"|format(item.market_value) }}</td>
+                        <td class="text-end cell-mono">{{ "%.2f"|format(item.gross_weight_pct) }}%</td>
+                        <td class="text-end cell-mono">{{ "%.2f"|format(item.net_weight_pct) }}%</td>
+                        <td class="text-end cell-mono">{% if item.beta is not none %}{{ "%.2f"|format(item.beta) }}{% else %}&mdash;{% endif %}</td>
+                        <td class="text-end cell-mono">{% if item.beta_adjusted_weight_pct is not none %}{{ "%.2f"|format(item.beta_adjusted_weight_pct) }}%{% else %}&mdash;{% endif %}</td>
+                        <td class="text-end cell-mono">{% if item.systematic_volatility is not none %}{{ "%.2f"|format(item.systematic_volatility * 100) }}%{% else %}&mdash;{% endif %}</td>
+                        <td class="text-end cell-mono">{% if item.idiosyncratic_volatility is not none %}{{ "%.2f"|format(item.idiosyncratic_volatility * 100) }}%{% else %}&mdash;{% endif %}</td>
+                        <td class="text-end cell-mono">{% if item.annualized_volatility is not none %}{{ "%.2f"|format(item.annualized_volatility * 100) }}%{% else %}&mdash;{% endif %}</td>
+                        <td class="text-end cell-mono">{{ item.observations }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="11" class="text-center text-muted py-4">No open positions with non-zero market value.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card p-4">
+        <h3 class="h5">Methodology and limitations</h3>
+        <ul class="small text-muted mb-0">
+            <li>Uses current IBKR position market values and up to one year of daily close-to-close returns, compared with SPY. Portfolio weights are held constant over the historical window; this is a current-holdings proxy, not realized historical portfolio performance. Cash and any unmodeled exposure are implicitly assigned zero return.</li>
+            <li>Systematic and idiosyncratic volatility are estimated by a single-factor linear regression. Idiosyncratic risk is the regression residual; it can still include other shared risk factors.</li>
+            <li>VaR is a parametric one-day 95% estimate based on the fitted portfolio-return sample. It assumes a roughly normal return distribution and can understate gap, tail, liquidity, and concentration risk.</li>
+            <li>Market-value weighting is not delta-adjusted. Option values reflect option premium rather than underlying-equivalent exposure; futures, FX, bonds, and non-US assets may not be well explained by SPY beta. FX movements, option Greeks, volatility/skew, rates, and nonlinear payoffs are not modeled.</li>
+            <li>Displayed market values and the account denominator are taken from IBKR. Estimates require sufficient overlapping price history; the modeled coverage figure reports the share of gross position market value included.</li>
+        </ul>
+    </div>
+{% endif %}
+{% endblock %}

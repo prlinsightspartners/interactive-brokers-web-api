@@ -19,11 +19,12 @@
                         <span>IBKR Web API</span>
                     </a>
                     <ul class="nav align-items-center">
-                        <li class="nav-item"><a href="/" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a></li>
-                        <li class="nav-item"><a href="/portfolio" class="nav-link {% if request.endpoint == 'portfolio' %}active{% endif %}">Portfolio</a></li>
-                        <li class="nav-item"><a href="/lookup" class="nav-link {% if request.endpoint == 'lookup' %}active{% endif %}">Stock Lookup</a></li>
-                        <li class="nav-item"><a href="/orders" class="nav-link {% if request.endpoint == 'orders' %}active{% endif %}">Orders</a></li>
-                        <li class="nav-item"><a href="/scanner" class="nav-link {% if request.endpoint == 'scanner' %}active{% endif %}">Scanner</a></li>
+                        <li class="nav-item"><a href="/" class="nav-link {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">Dashboard</a></li>
+                        <li class="nav-item"><a href="/portfolio" class="nav-link {% if request.endpoint == 'portfolio.portfolio' %}active{% endif %}">Portfolio</a></li>
+                        <li class="nav-item"><a href="/risk-management" class="nav-link {% if request.endpoint == 'portfolio.risk_management' %}active{% endif %}">Risk Management</a></li>
+                        <li class="nav-item"><a href="/lookup" class="nav-link {% if request.endpoint == 'contracts.lookup' %}active{% endif %}">Stock Lookup</a></li>
+                        <li class="nav-item"><a href="/orders" class="nav-link {% if request.endpoint == 'orders.orders' %}active{% endif %}">Orders</a></li>
+                        <li class="nav-item"><a href="/scanner" class="nav-link {% if request.endpoint == 'scanner.scanner' %}active{% endif %}">Scanner</a></li>
                         {% if accounts %}
                         <li class="nav-item ms-3">
                             <form method="get" action="/switch-account" class="d-flex align-items-center gap-2">

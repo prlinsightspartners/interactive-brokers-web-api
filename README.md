@@ -20,11 +20,11 @@ The project combines:
 ## Repository layout
 
 - `webapp/` — Flask dashboard application
-  - `app.py` — main Flask app and routes
+  - `app.py` — Flask application setup and route-blueprint registration
   - `trade_db.py` — SQLite trade log creation and upsert logic
   - `templates/` — HTML pages for dashboard, portfolio, orders, lookup, scanner, etc.
   - `static/` — CSS assets
-  - `scripts/` — reusable risk and order modules
+  - `scripts/` — Flask workflow modules, shared helpers, standalone risk/order helpers, and module documentation
   - `data/` — logged webhook traffic JSONL files
 - `ibkr-algo-tradeapp/` — FastAPI automation app
   - `main.py` — FastAPI startup and lifespan setup
@@ -98,13 +98,23 @@ The root dashboard is served from the Flask app and is designed to help you:
 
 ## Flask app features
 
-The main Flask app in `webapp/app.py` exposes several routes.
+`webapp/app.py` creates the Flask application and registers workflow blueprints
+implemented in `webapp/scripts/`.
 
 ### Account and portfolio routes
 
 - `/` — dashboard summary page
 - `/portfolio` — positions and account portfolio view
+- `/risk-management` — account-aware gross exposures, position concentration, and indicative SPY-factor risk estimates
 - `/switch-account` — set the active account in session
+
+The Risk Management page uses current IBKR positions and up to one year of daily
+contract and SPY prices to estimate beta, systematic volatility, residual
+idiosyncratic volatility, and one-day parametric 95% VaR. It also reports how
+much gross position value has sufficient price-history coverage. These are
+market-value-weighted estimates, not a full risk model: in particular, the
+single SPY factor does not capture all asset classes, and options are not
+delta-adjusted. See the page's methodology notes before relying on the figures.
 
 ### Contract and market data routes
 
@@ -232,9 +242,12 @@ Created by `ibkr-algo-tradeapp/init_db.py` and stores a `trades` table with:
 
 This is used for the trade log page and webhook-driven order history.
 
-## Risk and execution helper scripts
+## Flask workflow modules and standalone risk/execution helpers
 
-The `webapp/scripts/` directory contains reusable logic for algorithmic execution workflows:
+The Flask blueprints and their responsibilities are documented in
+[`webapp/scripts/README.md`](webapp/scripts/README.md). They are separate from
+the numbered standalone helpers, which contain reusable logic for algorithmic
+execution workflows:
 
 - `01_risk_checks.py` — `RiskChecker` and `RiskLimits` for validating order safety before execution
 - `02_position_checks.py` — likely position evaluation logic
@@ -243,7 +256,8 @@ The `webapp/scripts/` directory contains reusable logic for algorithmic executio
 - `05_order_construction.py` — `OrderBuilder` that turns a signal into a market/limit/stop order
 - `06_ibkr_execution.py` — `IBKRExecution` wrapper that validates and submits order objects to IBKR
 
-These scripts are examples of the broker-integration logic used by a larger algo trading workflow and are not all wired directly into the Flask app at runtime.
+These numbered scripts are examples of broker-integration logic used by a
+larger algo trading workflow and are not called by the Flask routes at runtime.
 
 ## Config and environment notes
 
@@ -326,9 +340,8 @@ This repo is best understood as a local automation sandbox for IBKR trading work
 If you are building or extending this project, the most important runtime entry points are:
 
 - `webapp/app.py`
+- `webapp/scripts/` (Flask workflow blueprints and their shared helpers)
 - `ibkr-algo-tradeapp/main.py`
 - `ibkr-algo-tradeapp/routers/trades.py`
 - `webapp/trade_db.py`
 - `conf.yaml`
-
-
