@@ -25,11 +25,31 @@ def webhook():
         # -----------------------------
 
         if data.get("secret") != WEBHOOK_SECRET:
-            print("Invalid webhook secret")
+            if not data:
+                reason = (
+                    "Request body was empty or not valid JSON, so no "
+                    "'secret' could be read. Send JSON with Content-Type: "
+                    "application/json."
+                )
+            elif "secret" not in data:
+                reason = "The 'secret' field is missing from the alert payload."
+            else:
+                reason = "The 'secret' in the alert payload does not match the server's WEBHOOK_SECRET."
+
+            strategy = data.get("strategy")
+            if not isinstance(strategy, dict):
+                strategy = {}
+            print("Rejected webhook:", reason)
 
             return jsonify({
                 "status": "error",
-                "message": "Invalid secret"
+                "error": "forbidden",
+                "message": f"Webhook rejected: {reason}",
+                "received": {
+                    "symbol": data.get("symbol"),
+                    "action": strategy.get("order_action"),
+                    "quantity": strategy.get("order_contracts"),
+                }
             }), 403
 
         # -----------------------------
