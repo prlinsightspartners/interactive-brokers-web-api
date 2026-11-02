@@ -66,18 +66,22 @@ git clone https://github.com/hackingthemarkets/interactive-brokers-web-api.git
 cd interactive-brokers-web-api
 ```
 
+Create a local `.env` file (it is git-ignored) with your own credentials:
+
+```bash
+IBKR_ACCOUNT_ID=your_ibkr_account_id
+WEBHOOK_SECRET=replace_with_a_long_random_secret
+NGROK_AUTHTOKEN=your_ngrok_authtoken
+```
+
 Start the stack:
 
 ```bash
 docker-compose up --build
 ```
 
-This starts the container and launches the gateway + web application. The container config also sets:
-
-- `IBKR_ACCOUNT_ID=DUO504961`
-- `WEBHOOK_SECRET=your_super_secret_string_123`
-
-These values are placeholders that should be adjusted to your environment.
+Docker Compose reads these values from `.env`; startup fails if any required value
+is missing. Never commit your `.env` file or share its credentials.
 
 ## Access points
 

@@ -4,7 +4,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get upgrade -y
 
 # Install JDK and any needed utilities
-RUN apt-get install -y openjdk-17-jre-headless \
+RUN apt-get install -y bash openjdk-17-jre-headless \
                        unzip curl procps vim net-tools \
                        python3 python3-pip python3.11-venv
 
@@ -33,7 +33,7 @@ COPY start.sh /app
 
 ADD webapp webapp
 ADD ibkr-algo-tradeapp ibkr-algo-tradeapp
-ADD scripts scripts
+# ADD scripts scripts
 
 # Commented out for now, some commands that are helpful if you want to install your own SSL certificate
 # RUN keytool -genkey -keyalg RSA -alias selfsigned -keystore cacert.jks -storepass abc123 -validity 730 -keysize 2048 -dname CN=localhost
@@ -47,4 +47,4 @@ ADD scripts scripts
 EXPOSE 5055 5056 4002
 
 # Run the gateway
-CMD sh ./start.sh
+CMD ["bash", "./start.sh"]
