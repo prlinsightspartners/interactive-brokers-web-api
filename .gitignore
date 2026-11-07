@@ -130,6 +130,14 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+market_signals_engine/data/input/*
+!market_signals_engine/data/input/.gitkeep
+market_signals_engine/data/output/*
+!market_signals_engine/data/output/.gitkeep
+market_signals_engine/data/daily_price_indicators.log
+market_signals_engine/data/scores/*
+!market_signals_engine/data/scores/.gitkeep
+market_signals_engine/data/scores/daily_directional_scores.log
 
 # Spyder project settings
 .spyderproject

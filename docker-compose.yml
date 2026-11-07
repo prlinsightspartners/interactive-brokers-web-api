@@ -16,3 +16,22 @@ services:
     volumes:
       - ./webapp:/app/webapp
       - ./ibkr-algo-tradeapp:/app/ibkr-algo-tradeapp
+  market-signals-engine:
+    build:
+      context: .
+      dockerfile: market_signals_engine/Dockerfile
+    image: market-signals-engine
+    container_name: market-signals-engine
+    environment:
+      INDICATOR_SOURCE_DIR: /data/prices
+      INDICATOR_OUTPUT_DIR: /data/indicators
+      INDICATOR_LOG_FILE: /data/daily_price_indicators.log
+      DIRECTIONAL_SCORES_DIR: /data/scores
+      INDICATOR_RUN_TIME: "${INDICATOR_RUN_TIME:-18:00}"
+      INDICATOR_TIMEZONE: "${INDICATOR_TIMEZONE:-America/New_York}"
+      TZ: "${INDICATOR_TIMEZONE:-America/New_York}"
+    volumes:
+      - ./market_signals_engine/data:/data
+      - "${PRICE_CSV_SOURCE_PATH:-C:/Github/options-chain-downloader/data/prices/csv_backups}:/data/prices:ro"
+      - "${INDICATORS_OUTPUT_PATH:-C:/Github/market_signals_engine/daily_price_indicators}:/data/indicators"
+    restart: unless-stopped

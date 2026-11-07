@@ -33,6 +33,8 @@ The project combines:
   - `init_db.py` — SQLite trade logging for the FastAPI app
   - `routers/trades.py` — webhook handling and order execution
   - `routers/charts.py` — chart page and bar subscription code
+- `market_signals_engine/` — scheduled daily price-indicator batch and manual
+  signal proposal tools; it does not connect to IBKR or submit orders
 - `Dockerfile` — container image for gateway + Python apps
 - `docker-compose.yml` — local stack configuration
 - `conf.yaml` — IBKR Gateway configuration
@@ -41,12 +43,13 @@ The project combines:
 
 ## Architecture
 
-The project runs the following services in the container:
+The Compose stack runs two services:
 
-1. IBKR Client Portal Gateway on the local Docker host
-2. Flask app at port `5056`
-3. FastAPI app at port `4002`
-4. Client Portal Gateway public API at `https://localhost:5055/v1/api`
+1. `web` runs the IBKR Client Portal Gateway, Flask app at port `5056`, and
+   FastAPI app at port `4002`; the gateway API is at `https://localhost:5055`.
+2. `market-signals-engine` runs separately at 6:00 PM Eastern, reads local
+   daily price backups, writes per-ticker indicator CSVs, and then generates a
+   weighted directional score file and score-run log.
 
 The Flask app is the operational dashboard, while the FastAPI app is the automated webhook execution layer.
 
@@ -82,6 +85,15 @@ docker-compose up --build
 
 Docker Compose reads these values from `.env`; startup fails if any required value
 is missing. Never commit your `.env` file or share its credentials.
+
+The indicator service reads daily OHLCV backups from
+`C:\Github\options-chain-downloader\data\prices\csv_backups` and writes files
+to `C:\Github\market_signals_engine\daily_price_indicators`. See
+[`market_signals_engine/README.md`](market_signals_engine/README.md) for input
+format, indicator and directional score outputs, logging, and schedule
+configuration. Score files are stored under
+`market_signals_engine/data/scores/`. The separate JSON signal proposal CLI
+remains manual; generated signals are not sent to IBKR.
 
 ## Access points
 
