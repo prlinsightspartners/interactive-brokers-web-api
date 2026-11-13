@@ -85,3 +85,68 @@ python -m market_signals_engine.scripts.daily_price_indicators \
 The existing JSON signal proposal CLI remains available separately via
 `market_signals_engine.cli`; the scheduled container job in this setup is the
 daily price-indicator batch.
+
+## MLflow experiment tracking
+
+The Compose stack runs MLflow separately from the scheduled engine. Start or
+rebuild both services with:
+
+```bash
+docker compose up --build -d mlflow market-signals-engine
+```
+
+Open the local MLflow UI at <http://localhost:5000>. The UI is bound to
+localhost only. MLflow stores its SQLite tracking database and artifacts under
+`market_signals_engine/data/mlflow/`, which persists across container
+recreations and is excluded from version control.
+
+Each successful scheduled indicator-and-score run is logged to the
+`daily-market-signals` experiment. Runs include the generated score CSV,
+per-source SHA-256 hashes and latest indicator dates, and summary metrics for
+tickers and indicator rows. The full indicator CSVs remain in the configured
+indicator output directory rather than being duplicated into MLflow artifacts.
+If MLflow is temporarily unavailable, the scheduler logs the tracking error
+while keeping the generated indicator and score files.
+
+Use separate experiments for future portfolio workflows, for example
+`portfolio-backtests` and `daily-portfolio-weights`. Each backtest should log
+its data snapshot/hash, strategy version and parameters, asset universe,
+benchmark, rebalance rules, position constraints, and transaction-cost
+assumptions. Log comparable performance and risk metrics as metrics, and save
+weights, tear sheets, and other reports as artifacts. The tracking server
+records these results; it does not run backtests, generate weights, or produce
+reports itself.
+
+A backtest runner can use the engine's configured tracking URI directly:
+
+```python
+import os
+import mlflow
+
+mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+mlflow.set_experiment("portfolio-backtests")
+with mlflow.start_run(run_name="my-strategy-2026-11-12"):
+    mlflow.log_params(
+        {
+            "strategy_version": "1",
+            "benchmark": "SPY",
+            "rebalance_frequency": "daily",
+            "transaction_cost_bps": 5,
+        }
+    )
+    mlflow.log_metrics(
+        {
+            "annualized_return": 0.12,
+            "sharpe_ratio": 1.1,
+            "max_drawdown": -0.18,
+            "turnover": 0.35,
+        }
+    )
+    mlflow.log_artifact("outputs/weights.csv", artifact_path="weights")
+    mlflow.log_artifact("outputs/tearsheet.html", artifact_path="reports")
+```
+
+In Compose-run scripts, use the `MLFLOW_TRACKING_URI` environment variable
+instead of hard-coding the service URL. The example metric values are
+illustrative; calculate and validate metrics from each backtest's actual
+returns and assumptions.

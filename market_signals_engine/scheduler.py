@@ -12,6 +12,7 @@ from .scripts.daily_price_indicators import (
     run_batch,
 )
 from .scripts.calculate_directional_scores import generate_directional_scores
+from .tracking import log_daily_signals_run
 
 
 def main() -> None:
@@ -54,10 +55,25 @@ def main() -> None:
 
         last_attempted_date = now.date()
         try:
-            run_batch(source_dir, output_dir, now.date(), log_file)
-            generate_directional_scores(output_dir, scores_dir, now.date())
+            summaries = run_batch(source_dir, output_dir, now.date(), log_file)
+            score_file = generate_directional_scores(
+                output_dir, scores_dir, now.date()
+            )
         except Exception as error:
             logger.error("Scheduled indicator run failed: %s", error)
+            continue
+
+        try:
+            run_id = log_daily_signals_run(
+                source_dir, summaries, score_file, now.date()
+            )
+            if run_id is not None:
+                logger.info("Daily market-signals run logged to MLflow: %s", run_id)
+        except Exception:
+            logger.exception(
+                "Could not log daily market-signals run to MLflow; "
+                "indicator and score files remain available locally"
+            )
 
 
 def _parse_time(value: str) -> time:

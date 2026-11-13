@@ -43,13 +43,17 @@ The project combines:
 
 ## Architecture
 
-The Compose stack runs two services:
+The Compose stack runs the following services:
 
 1. `web` runs the IBKR Client Portal Gateway, Flask app at port `5056`, and
    FastAPI app at port `4002`; the gateway API is at `https://localhost:5055`.
 2. `market-signals-engine` runs separately at 6:00 PM Eastern, reads local
    daily price backups, writes per-ticker indicator CSVs, and then generates a
    weighted directional score file and score-run log.
+3. `mlflow` provides local experiment tracking for daily market signals and
+   future portfolio backtests. Its UI is available at `http://localhost:5000`;
+   the tracking database and artifacts persist under
+   `market_signals_engine/data/mlflow/`.
 
 The Flask app is the operational dashboard, while the FastAPI app is the automated webhook execution layer.
 
@@ -91,9 +95,9 @@ The indicator service reads daily OHLCV backups from
 to `C:\Github\market_signals_engine\daily_price_indicators`. See
 [`market_signals_engine/README.md`](market_signals_engine/README.md) for input
 format, indicator and directional score outputs, logging, and schedule
-configuration. Score files are stored under
-`market_signals_engine/data/scores/`. The separate JSON signal proposal CLI
-remains manual; generated signals are not sent to IBKR.
+configuration, MLflow tracking, and portfolio experiment guidance. Score
+files are stored under `market_signals_engine/data/scores/`. The separate JSON
+signal proposal CLI remains manual; generated signals are not sent to IBKR.
 
 ## Access points
 

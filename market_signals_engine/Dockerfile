@@ -9,5 +9,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY market_signals_engine /app/market_signals_engine
+RUN pip install --no-cache-dir -r /app/market_signals_engine/requirements.txt
 
 CMD ["python", "-m", "market_signals_engine.scheduler"]
