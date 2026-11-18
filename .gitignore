@@ -139,6 +139,8 @@ market_signals_engine/data/mlflow/
 market_signals_engine/data/scores/*
 !market_signals_engine/data/scores/.gitkeep
 market_signals_engine/data/scores/daily_directional_scores.log
+market_signals_engine/order_generation/logs/*.jsonl
+!market_signals_engine/order_generation/logs/.gitkeep
 
 # Spyder project settings
 .spyderproject
